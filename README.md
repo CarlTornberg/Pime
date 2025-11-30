@@ -1,6 +1,7 @@
 # Pime
+
 ## What:
-A time-based on-chain vault securing your assets all within your control, even if your private key is stolen.
+A Pinocchio time-based on-chain vault securing your assets all within your control, even if your private key is stolen.
 
 ## Why:
 Secures assets owned by a wallet behind the only thing one can buy, time.
