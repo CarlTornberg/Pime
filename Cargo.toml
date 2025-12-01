@@ -1,0 +1,32 @@
+[package]
+name = "pime"
+version = "0.1.0"
+edition = "2021"
+
+no-entrypoint = []
+test-sbf = [] # Wraps all tests under cargo test-sbf
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = [
+  'cfg(feature, values("custom-heap", "custom-panic"))',
+  'cfg(target_os, values("solana"))',
+]
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+pinocchio = "0.9.2"
+pinocchio-log = "0.5.1"
+pinocchio-pubkey = "0.3.0"
+pinocchio-system = "0.4.0"
+
+[dev-dependencies]
+mollusk-svm = "0.7.2"
+mollusk-svm-bencher = "0.7.2"
+solana-sdk = "3.0.0"
+
+[[bench]]
+name = "compute_units"
+harness = false
