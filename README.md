@@ -117,15 +117,12 @@ Look into:
 
 # Comments during iterations
 * *IMPORTANT COMMENT* if the private key is stolen, the attacker can still access your assets.
-
-Answer: This is to minimize the likelyhood of being targeted, sacrificing 
+* * Answer: This is to minimize the likelyhood of being targeted, sacrificing 
 some convinience. (Is there a way to do this on-chain?)
 * *IMPORTANT QUESTION* Is there a solution to verify that the person who access the wallet is 
 the real owner of the wallet?
-
-Answer: Since the plan is to at this stage completely do this on-chain and not a 
+* * Answer: Since the plan is to at this stage completely do this on-chain and not a 
 centralized off-chain solution, no.
-
 * *Comment/suggestion* Use LiteSVM for testing, easier than Mollusk.
 * *Question* Are vaults and transfers seperated.
 * *Question* Who are the users: regular people, not businesses.
