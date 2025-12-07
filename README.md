@@ -45,7 +45,7 @@ Safety never prevents crime to happen, but give time for lawenforment to react, 
 * Native and SPL token support - Any assets can be saved in the vault, Native just as SPL tokens (Including NFTs (Stage 2)).
 
 ## Vocabulary
-* Vault - An on-chain vault owned by Pime, controlled by its authority.
+ Vault - An on-chain vault owned by Pime, controlled by its authority.
 * Timeframe - Timeframe of a vault's restrictions.
 * Transaction - Transactions between a vault and an address, with limited timeframe outflow.
 * Transfer - Larger transaction from a vault to an address, requiring additional timeframe safeguards.
@@ -110,7 +110,7 @@ The user can close both vaults and transactions, where the vault must be empty o
 
 # Phase 1
 ## Deadline 8 Dec -25
-* Complete user stories.
+* Complete user stories. (Done)
 
 ## Deadline 15 Dec -25
 * Completed architecture diagram.
