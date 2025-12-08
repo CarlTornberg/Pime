@@ -15,9 +15,9 @@ Only a portion of your funds can be extracted within a certain time-frame, limit
 However, to accommodate larger transactions, the transaction has to be booked beforehand, with the ability to be canceled.
 
 ### Stack:
-Pinocchio
-Mollusk (Replace with LiteSVM?)
-SurfPool
+* Pinocchio
+* Mollusk (Replace with LiteSVM?)
+* SurfPool
 
 ## Overview
 ### Product-Market Fit
