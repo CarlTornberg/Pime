@@ -92,23 +92,6 @@ The user can close both vaults and transactions, where the vault must be empty o
 * As an on-chain user, when I transfer assets to an transfer under warmup, the assets are transferred (system program interaction)
 * As an on-chain user, when I transfer assets to an expired transfer, the assets are transferred (system program interaction)
 
-#### An attacker without a vault owners private key
-##### Vault
-* As an attacker, if I try to create a vault data, nothing will happen.
-* As an attacker, if I try to withdraw assets to a different wallet than the original, nothing will happen.
-* As an attacker, if I try to close a vault, nothing will happen.
-* As an attacker, if I try to close a vault data, nothing will happen.
-##### Transfer
-* As an attacker, if I try to withdraw assets from a deposited transaction, nothing will happen.
-* As an attacker, if I try to unbook a transfer, nothing will happen.
-
-#### An attacker with a vault owners private key
-##### Vault
-* As an attacker, if I try to drain a vault to different address than what created it, nothing will happen.
-* As an attacker, if I try to drain a vault back to the authority wallet, the vault's time-frame threshold can not be exceeded.
-##### Transfer
-* As an attacker, if I try to book a transfer below the vaults min timeframe, nothing will happen.
-* As an attacker, if I try to book a transfer within the vault min timeframe, the transaction can be cancelled.
 
 ## Timeline
 ### Deadline 8 Dec -25
