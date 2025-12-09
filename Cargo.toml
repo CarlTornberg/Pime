@@ -21,8 +21,7 @@ pinocchio = "0.9.2"
 pinocchio-log = "0.5.1"
 pinocchio-pubkey = "0.3.0"
 pinocchio-system = "0.4.0"
-spl-token-interface = "2.0.0"
-spl-associated-token-account-interface = "2.0.0"
+pinocchio-token = "0.4.0"
 
 [dev-dependencies]
 bincode = "2.0.1"

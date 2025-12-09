@@ -82,14 +82,19 @@ impl Vault {
             &crate::ID)
     }
 
-    /// Calculates the vault PDA with bump.
-    /// Derived from the vault data PDA.
+    /// Get the Vault PDA, which is a ATA owner by the vault_data
+    /// TODO Should this be a ATA or not?
+    /// Pro: Predictable and follow the regular way of deriving it
+    /// Con: Needs to be derived by the ATA ID, and calling the ADA does nothing
+    /// else than checks that the ATA derivation is correct, then calls
+    /// the token program to create the account, which is then owned by the token program.
     pub fn get_vault_pda(vault_data: &Pubkey, mint: &Pubkey, token_program: &Pubkey) -> (Pubkey, u8) {
-        find_program_address(&[
-            vault_data,
-            mint,
-        ], 
-            token_program)
+        // Is an ATA drived address.
+        find_program_address(
+            &[
+                vault_data.as_slice(),
+            ], 
+            &crate::ID)
     }
     
     /// Calculates the vault stake PDA with bump.
@@ -101,5 +106,18 @@ impl Vault {
             vault_data,
         ], 
             &crate::ID)
+    }
+
+    /// Packs a vault to its byte format.
+    pub fn pack(&self, buf: &mut [u8; size_of::<Vault>()]) {
+        buf.copy_from_slice(
+            // # SAFETY: Vault is Transmutable
+            unsafe {
+                core::slice::from_raw_parts(
+                    self as *const Self as *const u8,
+                    size_of::<Vault>()
+                )
+            }
+        );
     }
 }

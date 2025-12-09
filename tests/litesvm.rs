@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod litesvm_tests {
     use litesvm::LiteSVM;
+    use pime::interface::instructions::create_vault_instruction::helpers::create_vault_instruction;
     use solana_sdk::program_error::ProgramError;
     use solana_sdk::{message::Message, native_token::LAMPORTS_PER_SOL, program_pack::Pack, pubkey::Pubkey, rent, signature::Keypair, signer::Signer, transaction::Transaction};
     use spl_token_interface::state::{GenericTokenAccount, Mint};
@@ -20,8 +21,19 @@ mod litesvm_tests {
         
         svm.airdrop(&from, LAMPORTS_PER_SOL).unwrap();
 
-        create_and_mint_to(&mut svm, &from_keypair, &to, 100_000, &token_program).unwrap();
+        let mint = create_and_mint_to(&mut svm, &from_keypair, &to, 100_000, &token_program).unwrap();
 
+        let index = 0u64;
+        let create_vault_inst = create_vault_instruction(from, mint, token_program, index, 0, 0, 0);
+
+        svm.send_transaction(
+            Transaction::new(
+                &[from_keypair], 
+                Message::new(
+                    &[create_vault_inst], 
+                    Some(&from)
+                ),
+                svm.latest_blockhash())).unwrap();
     }
 
     // Helpers 

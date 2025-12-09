@@ -14,8 +14,8 @@ pub enum PimeInstruction {
     ///   0. `[signer]` The authority of the new vault
     ///   1. `[writeable]` The vault data account.
     ///   2. `[writeable]` The vault account.
-    ///   3. `[]` The mint address of the vault. (Optional)
-    ///   4. `[]` The token program. (Optional)
+    ///   3. `[]` The mint address of the vault. 
+    ///   4. `[]` The token program. 
     ///
     /// Data expected by this instruction:
     ///

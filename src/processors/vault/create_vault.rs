@@ -11,19 +11,17 @@ pub fn process_create_vault(accounts: &[AccountInfo], instrution_data: &[u8]) ->
         timeframe, 
         max_transactions, 
         max_lamports, 
-        warmup ) = if instrution_data.len() >= 
+        ) = if instrution_data.len() >= 
     size_of::<u64>() + // Vault index
     size_of::<u64>() + // Time frame
     size_of::<u64>() + // max_timeframe_transactions
-    size_of::<u64>() + // max_timeframe_lamports
-    size_of::<u64>()   // min_transfer_warmup
+    size_of::<u64>()   // max_timeframe_lamports
     {
         (
             u64::from_le_bytes(unsafe { *(instrution_data.as_ptr() as *const [u8; size_of::<u64>()]) }),
             u64::from_le_bytes(unsafe { *(instrution_data.as_ptr().add(size_of::<u64>()) as *const [u8; size_of::<u64>()]) }),
             u64::from_le_bytes(unsafe { *(instrution_data.as_ptr().add(size_of::<u64>() * 2) as *const [u8; size_of::<u64>()]) }),
             u64::from_le_bytes(unsafe { *(instrution_data.as_ptr().add(size_of::<u64>() * 3) as *const [u8; size_of::<u64>()]) }),
-            u64::from_le_bytes(unsafe { *(instrution_data.as_ptr().add(size_of::<u64>() * 4) as *const [u8; size_of::<u64>()]) }),
         )
     }
     else {
@@ -60,19 +58,19 @@ pub fn process_create_vault(accounts: &[AccountInfo], instrution_data: &[u8]) ->
 
     pinocchio_system::
         create_account_with_minimum_balance(
-            vault_data, 
-            size_of::<Vault>(), 
-            &crate::ID, 
-            authority, 
-            None)?;
+            /* account */ vault_data, 
+            /* space */ size_of::<Vault>(), 
+            /* owner */ &crate::ID, 
+            /* payer */ authority, 
+            /* rent sysvar */ None)?;
     
     pinocchio_system::
         create_account_with_minimum_balance(
-            vault, 
-            0,
-            &crate::ID, 
-            authority, 
-            None)?;
+            /* account */ vault, 
+            /* space */ 0,
+            /* owner */ &crate::ID, 
+            /* payer */ authority, 
+            /* rent sysvar */ None)?;
 
     if let Ok(mut vault_data_mut) = vault_data.try_borrow_mut_data() {
         let data = Vault::new(vault_data_pda.1, *authority.key());
