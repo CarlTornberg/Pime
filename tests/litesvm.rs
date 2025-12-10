@@ -1,10 +1,15 @@
 #[cfg(test)]
 mod litesvm_tests {
+    use std::env::{current_dir, home_dir};
+    use std::path::Path;
+
     use litesvm::LiteSVM;
-    use pime::interface::instructions::create_vault_instruction::helpers::create_vault_instruction;
+    use pime::interface::pime_instruction::PimeInstruction;
+    use pime::states::Vault;
+    use solana_sdk::message::{AccountMeta, Instruction};
     use solana_sdk::program_error::ProgramError;
     use solana_sdk::{message::Message, native_token::LAMPORTS_PER_SOL, program_pack::Pack, pubkey::Pubkey, rent, signature::Keypair, signer::Signer, transaction::Transaction};
-    use spl_token_interface::state::{GenericTokenAccount, Mint};
+    use spl_token_interface::state::Mint;
     use spl_token_interface::state::Account as TokenAccount;
 
     #[test]
@@ -12,6 +17,11 @@ mod litesvm_tests {
         let mut svm = LiteSVM::new();
 
         let pime_id = Pubkey::new_from_array(pime::ID);
+        let pime_program_path = Path::join(&current_dir().unwrap(), "target/sbpf-solana-solana/release/pime.so");
+        if let Err(e) = svm.add_program_from_file(pime_id, pime_program_path) {
+            panic!("Could not add Pime program: {}", e);
+        }
+
         let token_program = spl_token_interface::ID;
         // let native_mint = spl_token_interface::native_mint::ID;
 
@@ -23,17 +33,39 @@ mod litesvm_tests {
 
         let mint = create_and_mint_to(&mut svm, &from_keypair, &to, 100_000, &token_program).unwrap();
 
-        let index = 0u64;
-        let create_vault_inst = create_vault_instruction(from, mint, token_program, index, 0, 0, 0);
+        let authority = Keypair::new();
+        svm.airdrop(&authority.pubkey(), LAMPORTS_PER_SOL).unwrap();
 
-        svm.send_transaction(
-            Transaction::new(
-                &[from_keypair], 
-                Message::new(
-                    &[create_vault_inst], 
-                    Some(&from)
-                ),
-                svm.latest_blockhash())).unwrap();
+        let index = 0u64;
+        let vault_data = find_vault_data_pda(&authority.pubkey(), index, &mint, &token_program);
+        let vault = find_vault_pda(&vault_data.0);
+
+        let create_vault_inst = Instruction::new_with_bytes(
+            /* program id*/ pime_id, 
+            /* data */ PimeInstruction::serialize_create_vault_inst_data(
+                index, 
+                /* timeframe */ 0, 
+                /* max_withdraws */ 0, 
+                /* max_lamport_withdraw */ 0
+            ).as_slice(), 
+            /* accounts */ [
+                AccountMeta::new(authority.pubkey(), true),
+                AccountMeta::new(vault_data.0, false),
+                AccountMeta::new(vault.0, false),
+                AccountMeta::new_readonly(mint, false),
+                AccountMeta::new_readonly(token_program, false),
+                AccountMeta::new_readonly(solana_system_interface::program::ID, false),
+            ].to_vec()
+        );
+
+        let r = svm.send_transaction(Transaction::new(
+            /* from keypairs */ &[&authority], 
+            /* message */ Message::new(
+                /* instructions */ &[create_vault_inst],
+                /* payer */ Some(&authority.pubkey())),
+            /* latest blockhash */ svm.latest_blockhash()
+        ));
+        panic!("{:#?}", r);
     }
 
     // Helpers 
@@ -101,5 +133,23 @@ mod litesvm_tests {
         let to_ata_token_account = TokenAccount::unpack(&to_ata_account.data).unwrap();
         assert_eq!(to_ata_token_account.amount, mint_amount);
         Ok(mint.pubkey())
+    }
+
+    fn find_vault_data_pda(authority: &Pubkey, index: u64, mint: &Pubkey, token_program: &Pubkey) -> (Pubkey, u8) {
+        Pubkey::find_program_address(&[
+            Vault::VAULT_DATA_SEED,
+            &authority.to_bytes(),
+            &index.to_le_bytes(),
+            &mint.to_bytes(),
+            &token_program.to_bytes(),
+        ], 
+            &Pubkey::new_from_array(pime::ID))
+    }
+
+    fn find_vault_pda(vault_data: &Pubkey) -> (Pubkey, u8) {
+        Pubkey::find_program_address(&[
+            &vault_data.to_bytes(),
+        ],
+            &Pubkey::new_from_array(pime::ID))
     }
 }

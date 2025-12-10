@@ -15,6 +15,7 @@ pub struct Vault {
 
 unsafe impl Transmutable for Vault { }
 
+#[allow(dead_code)]
 impl Vault {
     pub const VAULT_SEED: &[u8] = b"vault";
     pub const VAULT_DATA_SEED: &[u8] = b"vault_data";
@@ -71,16 +72,18 @@ impl Vault {
     ///
     /// Index allows an author to have multiple vaults for a specific token
     /// This enabled additional fine grained control over an asset.
-    pub fn get_vault_data_pda(author: &Pubkey, index: u64, mint: &Pubkey, token_program: &Pubkey) -> (Pubkey, u8) {
-        find_program_address(&[
+    pub fn get_vault_data_pda(authority: &Pubkey, index: u64, mint: &Pubkey, token_program: &Pubkey) -> (Pubkey, u8) {
+        let program_id = &crate::ID;
+        let seeds = &[
             Vault::VAULT_DATA_SEED,
-            author,
+            authority,
             &index.to_le_bytes(),
             mint,
             token_program,
-        ], 
-            &crate::ID)
+        ];
+        find_program_address(seeds, program_id)
     }
+
 
     /// Get the Vault PDA, which is a ATA owner by the vault_data
     /// TODO Should this be a ATA or not?
@@ -88,12 +91,11 @@ impl Vault {
     /// Con: Needs to be derived by the ATA ID, and calling the ADA does nothing
     /// else than checks that the ATA derivation is correct, then calls
     /// the token program to create the account, which is then owned by the token program.
-    pub fn get_vault_pda(vault_data: &Pubkey, mint: &Pubkey, token_program: &Pubkey) -> (Pubkey, u8) {
-        // Is an ATA drived address.
-        find_program_address(
-            &[
-                vault_data.as_slice(),
-            ], 
+    pub fn get_vault_pda(vault_data: &Pubkey) -> (Pubkey, u8) {
+        // Is an ATA derived address.
+        find_program_address(&[
+            vault_data,
+        ], 
             &crate::ID)
     }
     
@@ -111,7 +113,7 @@ impl Vault {
     /// Packs a vault to its byte format.
     pub fn pack(&self, buf: &mut [u8; size_of::<Vault>()]) {
         buf.copy_from_slice(
-            // # SAFETY: Vault is Transmutable
+            // # SAFETY Vault is Transmutable
             unsafe {
                 core::slice::from_raw_parts(
                     self as *const Self as *const u8,
