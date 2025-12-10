@@ -12,73 +12,96 @@ mod litesvm_tests {
     use spl_token_interface::state::Mint;
     use spl_token_interface::state::Account as TokenAccount;
 
-    #[test]
-    fn create_vault() {
-        let mut svm = LiteSVM::new();
-
-        let pime_id = Pubkey::new_from_array(pime::ID);
+    fn create_svm() -> LiteSVM {
         let pime_program_path = Path::join(&current_dir().unwrap(), "target/sbpf-solana-solana/release/pime.so");
-        if let Err(e) = svm.add_program_from_file(pime_id, pime_program_path) {
+        let mut svm = LiteSVM::new();
+        if let Err(e) = svm.add_program_from_file(PIME_ID, pime_program_path) {
             panic!("Could not add Pime program: {}", e);
         }
+        svm
+    }
+    const PIME_ID: Pubkey = Pubkey::new_from_array(pime::ID);
+
+    #[test]
+    fn alice_creates_vault() {
+        let mut svm = create_svm();
 
         let token_program = spl_token_interface::ID;
-        // let native_mint = spl_token_interface::native_mint::ID;
 
         let from_keypair = Keypair::new();
         let from = from_keypair.pubkey();
         let to = Pubkey::new_unique();
-        
-        svm.airdrop(&from, LAMPORTS_PER_SOL).unwrap();
-
-        let mint = create_and_mint_to(&mut svm, &from_keypair, &to, 100_000, &token_program).unwrap();
-
-        let authority = Keypair::new();
-        svm.airdrop(&authority.pubkey(), LAMPORTS_PER_SOL).unwrap();
 
         let index = 0u64;
         let timeframe = 67u64;
-        let vault_data = find_vault_data_pda(&authority.pubkey(), index, &mint, &token_program);
-        let vault = find_vault_pda(&vault_data.0);
+        let max_lamports = LAMPORTS_PER_SOL;
+        let max_withdraws = 10u64;
 
-        let create_vault_inst = Instruction::new_with_bytes(
-            /* program id*/ pime_id, 
-            /* data */ PimeInstruction::serialize_create_vault_inst_data(
-                index, 
-                timeframe, 
-                /* max_withdraws */ 0, 
-                /* max_lamport_withdraw */ 0
-            ).as_slice(), 
-            /* accounts */ [
-                AccountMeta::new(authority.pubkey(), true),
-                AccountMeta::new(vault_data.0, false),
-                AccountMeta::new(vault.0, false),
-                AccountMeta::new_readonly(mint, false),
-                AccountMeta::new_readonly(token_program, false),
-                AccountMeta::new_readonly(solana_system_interface::program::ID, false),
-            ].to_vec()
-        );
+        // Create new mint
+        svm.airdrop(&from, LAMPORTS_PER_SOL).unwrap();
+        let mint = create_and_mint_to(
+            &mut svm, 
+            &from_keypair, 
+            &to, 
+            100_000, 
+            &token_program).unwrap();
 
-        if let Err(e) = svm.send_transaction(Transaction::new(
-            /* from keypairs */ &[&authority], 
-            /* message */ Message::new(
-                /* instructions */ &[create_vault_inst],
-                /* payer */ Some(&authority.pubkey())),
-            /* latest blockhash */ svm.latest_blockhash()
-        )) {
-            panic!("{:#?}", e);
-        };
-
-        let vault_data_bytes = svm.get_account(&vault_data.0).unwrap().data;
-
-        // # SAFETY Data bytes are of type Vault
-        let vault_acc = unsafe { pime::states::from_bytes::<Vault>(&vault_data_bytes) };
-        assert_eq!(vault_acc.unwrap().timeframe(), timeframe);
+        // Create vault based on the new mint
+        let authority = Keypair::new();
+        svm.airdrop(&authority.pubkey(), LAMPORTS_PER_SOL).unwrap();
+        
+        create_new_vault(
+            &mut svm, 
+            &authority, 
+            (index, timeframe, max_withdraws, max_lamports), 
+            &mint, 
+            &token_program);
 
     }
 
+    #[test]
+    fn alice_deposits_to_own_vault() {
+        let mut svm = create_svm();
+
+        let token_program = spl_token_interface::ID;
+
+        let from_keypair = Keypair::new();
+        let from = from_keypair.pubkey();
+        let to = Pubkey::new_unique();
+
+        let index = 0u64;
+        let timeframe = 67u64;
+        let max_lamports = LAMPORTS_PER_SOL;
+        let max_withdraws = 10u64;
+
+        // Create new mint
+        svm.airdrop(&from, LAMPORTS_PER_SOL).unwrap();
+        let mint = create_and_mint_to(
+            &mut svm, 
+            &from_keypair, 
+            &to, 
+            100_000, 
+            &token_program).unwrap();
+
+        // Create vault based on the new mint
+        let authority = Keypair::new();
+        svm.airdrop(&authority.pubkey(), LAMPORTS_PER_SOL).unwrap();
+        
+        create_new_vault(
+            &mut svm, 
+            &authority, 
+            (index, timeframe, max_withdraws, max_lamports), 
+            &mint, 
+            &token_program);
+
+        // Deposit mint to new vault
+        todo!()
+    }
+
+
+
     // Helpers 
-    
+
     /// Creates a new mint, and mints the token to the to account.
     /// This function initializes the ATA of the to account.
     ///
@@ -144,6 +167,53 @@ mod litesvm_tests {
         Ok(mint.pubkey())
     }
 
+    fn create_new_vault(svm: &mut LiteSVM, 
+        authority: &Keypair, 
+        instuction_data: (u64, u64, u64, u64),
+        mint: &Pubkey, 
+        token_program: &Pubkey,) {
+        let vault_data = find_vault_data_pda(
+            &authority.pubkey(), 
+            instuction_data.0, 
+            mint, 
+            token_program);
+        let vault = find_vault_pda(&vault_data.0);
+
+        let create_vault_inst = Instruction::new_with_bytes(
+            /* program id*/     PIME_ID, 
+            /* data */          PimeInstruction::serialize_create_vault_inst_data(
+                instuction_data.0, 
+                instuction_data.1, 
+                instuction_data.2, 
+                instuction_data.3
+            ).as_slice(), 
+            /* accounts */ [
+                AccountMeta::new(authority.pubkey(), true),
+                AccountMeta::new(vault_data.0, false),
+                AccountMeta::new(vault.0, false),
+                AccountMeta::new_readonly(*mint, false),
+                AccountMeta::new_readonly(*token_program, false),
+                AccountMeta::new_readonly(solana_system_interface::program::ID, false),
+            ].to_vec()
+        );
+
+        if let Err(e) = svm.send_transaction(Transaction::new(
+            /* from keypairs */     &[&authority], 
+            /* message */           Message::new(
+                /* instructions */  &[create_vault_inst],
+                /* payer */         Some(&authority.pubkey())),
+            /* latest blockhash */  svm.latest_blockhash()
+        )) {
+            panic!("{:#?}", e);
+        };
+
+        let vault_data_bytes = svm.get_account(&vault_data.0).unwrap().data;
+        // # SAFETY Data bytes are of type Vault
+        let vault_acc = unsafe { pime::states::from_bytes::<Vault>(&vault_data_bytes) };
+        assert_eq!(vault_acc.unwrap().timeframe(), instuction_data.1);
+        assert_eq!(vault_acc.unwrap().max_withdraws(), instuction_data.2);
+        assert_eq!(vault_acc.unwrap().max_lamports(), instuction_data.3);
+    }
     fn find_vault_data_pda(authority: &Pubkey, index: u64, mint: &Pubkey, token_program: &Pubkey) -> (Pubkey, u8) {
         Pubkey::find_program_address(&[
             Vault::VAULT_DATA_SEED,

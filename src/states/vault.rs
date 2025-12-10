@@ -9,7 +9,7 @@ pub struct Vault {
     pub(crate) bump: u8,
     pub(crate) authority: Pubkey,
     timeframe: [u8; size_of::<u64>()],
-    max_transactions: [u8; size_of::<u64>()],
+    max_withdraws: [u8; size_of::<u64>()],
     max_lamports: [u8; size_of::<u64>()],
 }
 
@@ -28,7 +28,7 @@ impl Vault {
             bump, 
             authority, 
             timeframe: 8u64.to_le_bytes(), 
-            max_transactions: 0u64.to_le_bytes(), 
+            max_withdraws: 0u64.to_le_bytes(), 
             max_lamports: 0u64.to_le_bytes()
         }
     }
@@ -49,12 +49,12 @@ impl Vault {
         self.timeframe.copy_from_slice(&val.to_le_bytes());
     }
 
-    pub fn max_transactions(&self) -> u64 {
-        u64::from_le_bytes(self.max_transactions)
+    pub fn max_withdraws(&self) -> u64 {
+        u64::from_le_bytes(self.max_withdraws)
     }
 
-    pub(crate) fn set_max_transactions(&mut self, val: &u64) {
-        self.max_transactions.copy_from_slice(&val.to_le_bytes());
+    pub(crate) fn set_max_withdraws(&mut self, val: &u64) {
+        self.max_withdraws.copy_from_slice(&val.to_le_bytes());
     }
 
     pub fn max_lamports(&self) -> u64 {
