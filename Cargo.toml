@@ -22,13 +22,12 @@ pinocchio-log = "0.5.1"
 pinocchio-pubkey = "0.3.0"
 pinocchio-system = "0.4.0"
 pinocchio-token = "0.4.0"
+pinocchio-associated-token-account = "0.2.0"
 
 [dev-dependencies]
 bincode = "2.0.1"
 solana-system-interface = { version = "3.0.0", features = ["bincode"] }
 litesvm = "0.8.2"
 solana-sdk = "3.0.0"
-
-[[bench]]
-name = "compute_units"
-harness = false
+spl-token-interface = "2.0.0"
+spl-associated-token-account-interface = "2.0.0"
