@@ -1,21 +1,43 @@
-use crate::interface::pime_instruction::PimeInstruction;
+use crate::{interface::pime_instruction::PimeInstruction, states::Transmutable};
 
-impl PimeInstruction {
-    pub fn serialize_create_vault_inst_data(index: u64, timeframe: u64, max_withdraws: u64, max_lamports: u64) -> [u8; 33] {
-        // instruction data 
-        // - [0]: instruction discriminator
-        // - [1..9]: index
-        // - [9..17]: timeframe
-        // - [17..25]: max withdraws
-        // - [25..33]: max lamports
-        let mut data = [0; 33];
-        // Create vault instruction discriminator 0
-        data[1..9].copy_from_slice(&index.to_le_bytes());
-        data[9..17].copy_from_slice(&timeframe.to_le_bytes());
-        data[17..25].copy_from_slice(&max_withdraws.to_le_bytes());
-        data[25..33].copy_from_slice(&max_lamports.to_le_bytes());
+#[repr(C)]
+pub struct CreateVaultInstructionData {
+    pub discriminator: u8,
+    index: [u8; size_of::<u64>()],
+    timeframe: [u8; size_of::<u64>()],
+    max_withdraws: [u8; size_of::<u64>()],
+    max_lamports: [u8; size_of::<u64>()],
+}
 
-        data
+impl CreateVaultInstructionData {
+    
+    pub fn new(index: u64, timeframe: u64, max_withdraws: u64, max_lamports: u64) -> Self{
+        Self { 
+            discriminator: PimeInstruction::CreateVault as u8, 
+            index: index.to_le_bytes(), 
+            timeframe: timeframe.to_le_bytes(), 
+            max_withdraws: max_withdraws.to_le_bytes(),
+            max_lamports: max_lamports.to_le_bytes(), 
+        }
+    }
+
+    pub fn index(&self) -> u64 {
+        u64::from_le_bytes(self.index)
+    }
+
+    pub fn timeframe(&self) -> u64 {
+        u64::from_le_bytes(self.timeframe)
+    }
+
+    pub fn max_withdraws(&self) -> u64 {
+        u64::from_le_bytes(self.max_withdraws)
+    }
+
+    pub fn max_lamports(&self) -> u64 {
+        u64::from_le_bytes(self.max_lamports)
     }
 }
 
+/// # SAFETY : 
+/// All fields are of u8 and therefore without padding.
+unsafe impl Transmutable for CreateVaultInstructionData {}

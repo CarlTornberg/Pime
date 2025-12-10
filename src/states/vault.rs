@@ -110,16 +110,4 @@ impl Vault {
             &crate::ID)
     }
 
-    /// Packs a vault to its byte format.
-    pub fn pack(&self, buf: &mut [u8; size_of::<Vault>()]) {
-        buf.copy_from_slice(
-            // # SAFETY Vault is Transmutable
-            unsafe {
-                core::slice::from_raw_parts(
-                    self as *const Self as *const u8,
-                    size_of::<Vault>()
-                )
-            }
-        );
-    }
 }

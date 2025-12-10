@@ -4,7 +4,7 @@ use crate::states::{Vault, as_bytes};
 
 /// Create new vault given a vault index, authority, mint (with corresponding token program), and
 /// settings.
-pub fn process_create_vault(accounts: &[AccountInfo], instrution_data: &[u8]) -> ProgramResult {
+pub fn process_create_vault(accounts: &[AccountInfo], instruction_data: &[u8]) -> ProgramResult {
 
     // Validate instruction data
     let (
@@ -12,17 +12,17 @@ pub fn process_create_vault(accounts: &[AccountInfo], instrution_data: &[u8]) ->
         timeframe, 
         max_withdraws, 
         max_lamports, 
-        ) = if instrution_data.len() >= 
-    size_of::<u64>() + // Vault index
-    size_of::<u64>() + // Time frame
+        ) = if instruction_data.len() >= 
+    size_of::<u64>() + // vault index
+    size_of::<u64>() + // time frame
     size_of::<u64>() + // max withdraws (in the timeframe)
     size_of::<u64>()   // max lamports (in the timeframe)
     {
         (
-            u64::from_le_bytes(unsafe { *(instrution_data.as_ptr() as *const [u8; size_of::<u64>()]) }),
-            u64::from_le_bytes(unsafe { *(instrution_data.as_ptr().add(size_of::<u64>()) as *const [u8; size_of::<u64>()]) }),
-            u64::from_le_bytes(unsafe { *(instrution_data.as_ptr().add(size_of::<u64>() * 2) as *const [u8; size_of::<u64>()]) }),
-            u64::from_le_bytes(unsafe { *(instrution_data.as_ptr().add(size_of::<u64>() * 3) as *const [u8; size_of::<u64>()]) }),
+            u64::from_le_bytes(unsafe { *(instruction_data.as_ptr() as *const [u8; size_of::<u64>()]) }),
+            u64::from_le_bytes(unsafe { *(instruction_data.as_ptr().add(size_of::<u64>()) as *const [u8; size_of::<u64>()]) }),
+            u64::from_le_bytes(unsafe { *(instruction_data.as_ptr().add(size_of::<u64>() * 2) as *const [u8; size_of::<u64>()]) }),
+            u64::from_le_bytes(unsafe { *(instruction_data.as_ptr().add(size_of::<u64>() * 3) as *const [u8; size_of::<u64>()]) }),
         )
     }
     else {

@@ -4,7 +4,8 @@ mod litesvm_tests {
     use std::path::Path;
 
     use litesvm::LiteSVM;
-    use pime::interface::pime_instruction::PimeInstruction;
+    use pime::interface::instructions::create_vault_instruction::CreateVaultInstructionData;
+    use pime::shared;
     use pime::states::Vault;
     use solana_sdk::message::{AccountMeta, Instruction};
     use solana_sdk::program_error::ProgramError;
@@ -32,10 +33,12 @@ mod litesvm_tests {
         let from = from_keypair.pubkey();
         let to = Pubkey::new_unique();
 
-        let index = 0u64;
-        let timeframe = 67u64;
-        let max_lamports = LAMPORTS_PER_SOL;
-        let max_withdraws = 10u64;
+        let create_vault_instruction_data = CreateVaultInstructionData::new(
+            /* index */ 0u64, 
+            /* timeframe */ 67u64, 
+            /* max_withdraws */ 5u64, 
+            /* max_lamports */ LAMPORTS_PER_SOL
+        );
 
         // Create new mint
         svm.airdrop(&from, LAMPORTS_PER_SOL).unwrap();
@@ -53,7 +56,7 @@ mod litesvm_tests {
         create_new_vault(
             &mut svm, 
             &authority, 
-            (index, timeframe, max_withdraws, max_lamports), 
+            &create_vault_instruction_data,
             &mint, 
             &token_program);
 
@@ -69,10 +72,12 @@ mod litesvm_tests {
         let from = from_keypair.pubkey();
         let to = Pubkey::new_unique();
 
-        let index = 0u64;
-        let timeframe = 67u64;
-        let max_lamports = LAMPORTS_PER_SOL;
-        let max_withdraws = 10u64;
+        let create_vault_instruction_data = CreateVaultInstructionData::new(
+            /* index */ 0u64, 
+            /* timeframe */ 67u64, 
+            /* max_withdraws */ 5u64, 
+            /* max_lamports */ LAMPORTS_PER_SOL
+        );
 
         // Create new mint
         svm.airdrop(&from, LAMPORTS_PER_SOL).unwrap();
@@ -90,7 +95,7 @@ mod litesvm_tests {
         create_new_vault(
             &mut svm, 
             &authority, 
-            (index, timeframe, max_withdraws, max_lamports), 
+            &create_vault_instruction_data,
             &mint, 
             &token_program);
 
@@ -167,26 +172,26 @@ mod litesvm_tests {
         Ok(mint.pubkey())
     }
 
-    fn create_new_vault(svm: &mut LiteSVM, 
+    fn create_new_vault(
+        svm: &mut LiteSVM, 
         authority: &Keypair, 
-        instuction_data: (u64, u64, u64, u64),
+        instuction_data: &CreateVaultInstructionData,
         mint: &Pubkey, 
         token_program: &Pubkey,) {
         let vault_data = find_vault_data_pda(
             &authority.pubkey(), 
-            instuction_data.0, 
+            instuction_data.index(), 
             mint, 
             token_program);
         let vault = find_vault_pda(&vault_data.0);
 
+        let mut data = [0; size_of::<CreateVaultInstructionData>()];
+        shared::serialize(instuction_data, &mut data).unwrap();
+        println!("Create vault instruction data: {:?}", data);
+
         let create_vault_inst = Instruction::new_with_bytes(
             /* program id*/     PIME_ID, 
-            /* data */          PimeInstruction::serialize_create_vault_inst_data(
-                instuction_data.0, 
-                instuction_data.1, 
-                instuction_data.2, 
-                instuction_data.3
-            ).as_slice(), 
+            /* data */          data.as_slice(), 
             /* accounts */ [
                 AccountMeta::new(authority.pubkey(), true),
                 AccountMeta::new(vault_data.0, false),
@@ -210,10 +215,11 @@ mod litesvm_tests {
         let vault_data_bytes = svm.get_account(&vault_data.0).unwrap().data;
         // # SAFETY Data bytes are of type Vault
         let vault_acc = unsafe { pime::states::from_bytes::<Vault>(&vault_data_bytes) };
-        assert_eq!(vault_acc.unwrap().timeframe(), instuction_data.1);
-        assert_eq!(vault_acc.unwrap().max_withdraws(), instuction_data.2);
-        assert_eq!(vault_acc.unwrap().max_lamports(), instuction_data.3);
+        assert_eq!(vault_acc.unwrap().timeframe(), instuction_data.timeframe());
+        assert_eq!(vault_acc.unwrap().max_withdraws(), instuction_data.max_withdraws());
+        assert_eq!(vault_acc.unwrap().max_lamports(), instuction_data.max_lamports());
     }
+
     fn find_vault_data_pda(authority: &Pubkey, index: u64, mint: &Pubkey, token_program: &Pubkey) -> (Pubkey, u8) {
         Pubkey::find_program_address(&[
             Vault::VAULT_DATA_SEED,
