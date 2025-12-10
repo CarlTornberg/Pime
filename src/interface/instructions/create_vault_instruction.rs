@@ -11,6 +11,7 @@ impl PimeInstruction {
         let mut data = [0; 33];
         // Create Vault instruction i 0
         data[1..9].copy_from_slice(&index.to_le_bytes());
+        data[9..17].copy_from_slice(&timeframe.to_le_bytes());
         // Skip the rest for now since they are not strictly needed in the function call.
 
         data

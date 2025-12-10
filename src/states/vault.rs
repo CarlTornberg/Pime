@@ -8,9 +8,9 @@ pub struct Vault {
     version: [u8; size_of::<u64>()],
     pub(crate) bump: u8,
     pub(crate) authority: Pubkey,
-    last_used: [u8; size_of::<u64>()],
-    cooldown: [u8; size_of::<u64>()],
-    warmup: [u8; size_of::<u64>()],
+    timeframe: [u8; size_of::<u64>()],
+    max_transactions: [u8; size_of::<u64>()],
+    max_lamports: [u8; size_of::<u64>()],
 }
 
 unsafe impl Transmutable for Vault { }
@@ -24,12 +24,12 @@ impl Vault {
     pub fn new(bump: u8, authority: Pubkey) -> Self {
         Self { 
             discriminator: 0u8, 
-            version: 0u64.to_le_bytes(), 
+            version: 1u64.to_le_bytes(), 
             bump, 
             authority, 
-            last_used: 0u64.to_le_bytes(), 
-            cooldown: 0u64.to_le_bytes(), 
-            warmup: 0u64.to_le_bytes()
+            timeframe: 8u64.to_le_bytes(), 
+            max_transactions: 0u64.to_le_bytes(), 
+            max_lamports: 0u64.to_le_bytes()
         }
     }
 
@@ -41,28 +41,28 @@ impl Vault {
         self.version.copy_from_slice(&version.to_le_bytes());
     }
 
-    pub fn last_used(&self) -> u64 {
-        u64::from_le_bytes(self.last_used)
+    pub fn timeframe(&self) -> u64 {
+        u64::from_le_bytes(self.timeframe)
     }
 
-    pub(crate) fn set_last_used(&mut self, last_used: &u64) {
-        self.last_used.copy_from_slice(&last_used.to_le_bytes());
+    pub(crate) fn set_timeframe(&mut self, val: &u64) {
+        self.timeframe.copy_from_slice(&val.to_le_bytes());
     }
 
-    pub fn cooldown(&self) -> u64 {
-        u64::from_le_bytes(self.cooldown)
+    pub fn max_transactions(&self) -> u64 {
+        u64::from_le_bytes(self.max_transactions)
     }
 
-    pub(crate) fn set_cooldown(&mut self, cooldown: &u64) {
-        self.last_used.copy_from_slice(&cooldown.to_le_bytes());
+    pub(crate) fn set_max_transactions(&mut self, val: &u64) {
+        self.max_transactions.copy_from_slice(&val.to_le_bytes());
     }
 
-    pub fn warmup(&self) -> u64 {
-        u64::from_le_bytes(self.warmup)
+    pub fn max_lamports(&self) -> u64 {
+        u64::from_le_bytes(self.max_lamports)
     }
 
-    pub(crate) fn set_warmup(&mut self, warmup: &u64) {
-        self.warmup.copy_from_slice(&warmup.to_le_bytes());
+    pub(crate) fn set_max_lamports(&mut self, val: &u64) {
+        self.max_lamports.copy_from_slice(&val.to_le_bytes());
     }
 
 

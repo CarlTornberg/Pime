@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod litesvm_tests {
-    use std::env::{current_dir, home_dir};
+    use std::env::current_dir;
     use std::path::Path;
 
     use litesvm::LiteSVM;
@@ -37,6 +37,7 @@ mod litesvm_tests {
         svm.airdrop(&authority.pubkey(), LAMPORTS_PER_SOL).unwrap();
 
         let index = 0u64;
+        let timeframe = 67u64;
         let vault_data = find_vault_data_pda(&authority.pubkey(), index, &mint, &token_program);
         let vault = find_vault_pda(&vault_data.0);
 
@@ -44,7 +45,7 @@ mod litesvm_tests {
             /* program id*/ pime_id, 
             /* data */ PimeInstruction::serialize_create_vault_inst_data(
                 index, 
-                /* timeframe */ 0, 
+                timeframe, 
                 /* max_withdraws */ 0, 
                 /* max_lamport_withdraw */ 0
             ).as_slice(), 
@@ -58,14 +59,22 @@ mod litesvm_tests {
             ].to_vec()
         );
 
-        let r = svm.send_transaction(Transaction::new(
+        if let Err(e) = svm.send_transaction(Transaction::new(
             /* from keypairs */ &[&authority], 
             /* message */ Message::new(
                 /* instructions */ &[create_vault_inst],
                 /* payer */ Some(&authority.pubkey())),
             /* latest blockhash */ svm.latest_blockhash()
-        ));
-        panic!("{:#?}", r);
+        )) {
+            panic!("{:#?}", e);
+        };
+
+        let vault_data_bytes = svm.get_account(&vault_data.0).unwrap().data;
+
+        // # SAFETY Data bytes are of type Vault
+        let vault_acc = unsafe { pime::states::from_bytes::<Vault>(&vault_data_bytes) };
+        assert_eq!(vault_acc.unwrap().timeframe(), timeframe);
+
     }
 
     // Helpers 

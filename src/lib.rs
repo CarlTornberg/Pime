@@ -7,7 +7,7 @@ use pinocchio_pubkey::declare_id;
 
 pub mod interface;
 mod processors;
-mod shared;
+pub mod shared;
 pub mod states;
 
 program_entrypoint!(process_instruction);

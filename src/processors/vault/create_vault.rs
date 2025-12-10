@@ -103,7 +103,9 @@ pub fn process_create_vault(accounts: &[AccountInfo], instrution_data: &[u8]) ->
 
     // Set vault data account data
     if let Ok(mut vault_data_mut) = vault_data.try_borrow_mut_data() {
-        let data = Vault::new(vault_data_pda.1, *authority.key());
+        let mut data = Vault::new(vault_data_pda.1, *authority.key());
+        data.set_timeframe(&timeframe);
+
         vault_data_mut.copy_from_slice(as_bytes(&data));
     }
     else {
