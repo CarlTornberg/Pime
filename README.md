@@ -70,7 +70,7 @@ When a transaction is booked, the user's assets from the specified vault are mov
 * As a vault owner, when I deposit assets to the vault, the assets are moved to the vault.
 * As a vault owner, when I withdraw assets from a vault, the assets are moved back to the vault's owner.
 ##### Transfer
-* As a vault owner, if I book a transfer, the transfer is booked on-chain, and the assets are moved to a deposit with a set warmup period.
+* As a vault owner, if I book a transfer, the transfer is booked on-chain, and the assets are moved to a deposit with a set warm-up period.
 * As a vault owner, if I execute a transfer after the warm-up period has passed, the assets are transferred.
 * As a vault owner, if I unbook a booked transfer, the assets are moved back to the original vault.
 
