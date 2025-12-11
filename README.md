@@ -57,40 +57,26 @@ Safety never prevents crime to happen, but give time for law enforcement to reac
 
 ## User Story
 ### General End State 
-A user is able to create new vaults. Each asset type (native or SPL) can be stored in a vault, where the user is able to create multiple vaults per asset.
+A user is able to create new vaults. 
+An asset can be stored in a vault, where the user is able to create multiple vaults per asset.
 Each vault has its own outflow restriction, and is determined by the user upon creation.
-Moreover, the user is able to book larger transactions to a target wallet, where the supplied warm-up (min 72h(?.. idk why, better solutions?)) must pass before the transaction can be executed.
-When a transaction is booked, the user's assets from the specified vault are moved to a deposit wallet, and when the transaction is executed, the funds are sent to the target wallet.
-If more than its validity has passed from when the warm-up timer passed, the transaction needs to be closed, and a new one to be booked.
-The user can close both vaults and transactions, where the vault must be empty or below the supplied threshold so that the remaining funds can be sent back to the original wallet.
+Moreover, the user is able to book larger transactions to a target wallet, where a warm-up period must pass before execution.
+When a transaction is booked, the user's assets from the specified vault are moved to a deposit vault, and when the transaction is executed, the funds are sent to the target wallet.
 
 ### Actors
 #### A regular user who wants to store their assets (Vault owner)
 ##### Vault
-* As a new user, when I make a new vault, the vault is created along with the vault's restrictions.
-* As a new user, when I create another wallet using a different vault index but same asset type, a new vault is created along with the vault's restrictions.
+* As a new user, when I make a new vault, the provided index and mint creates a unique vault with vault specific outflow restrictions.
 * As a vault owner, when I deposit assets to the vault, the assets are moved to the vault.
-* As a vault owner, when I withdraw assets from a vault, the assets are moved back to the owners "original" pubkey for the asset.
-* As a vault owner, if I withdraw more times than the limit of the vault allows, no assets will be withdrawn.
-* As a vault owner, if I withdraw more assets than the limit of the vault allows, no assets will be withdrawn.
+* As a vault owner, when I withdraw assets from a vault, the assets are moved back to the vault's owner.
 ##### Transfer
-* As a vault owner, if I book a transfer, the transfer is booked on-chain, and the assets are moved to a deposit.
-* As a vault owner, if I try make a new transfer when a transfer already exists, nothing will happen.
-* As a vault owner, if I try to transfer a booked transaction before the warm-up has passed, nothing will happen.
-* As a vault owner, if I try to transfer a booked transaction after the transaction's validity timeframe, nothing will happen.
-* As a vault owner, if I unbook an transfer under warm-up, the assets are transferred back to the vault owner and the transfer closed.
-* As a vault owner, if I unbook an active transfer, the assets are transferred back to the vault owner and the transfer closed.
-* As a vault owner, if I unbook an expired transfer, the assets are transferred back to the vault owner and the transfer closed.
+* As a vault owner, if I book a transfer, the transfer is booked on-chain, and the assets are moved to a deposit with a set warmup period.
+* As a vault owner, if I execute a transfer after the warm-up period has passed, the assets are transferred.
+* As a vault owner, if I unbook a booked transfer, the assets are moved back to the original vault.
 
 #### A regular on-chain user (Not a vault owner)
 ##### Vault
-* As an on-chain user, when I transfer assets to an existing vault, the assets will be transferred.
-* As an on-chain user, when I transfer assets to an non-existing vault, the vault will be initialized and assets transferred WITHOUT initializing the vault data.
-##### Transfer (Only system program
-* As an on-chain user, when I transfer assets to an non booked transfer, the assets are transferred (system program interaction only)
-* As an on-chain user, when I transfer assets to an booked transfer, the assets are transferred (system program interaction)
-* As an on-chain user, when I transfer assets to an transfer under warm-up, the assets are transferred (system program interaction)
-* As an on-chain user, when I transfer assets to an expired transfer, the assets are transferred (system program interaction)
+* As an on-chain user, when I transfer assets to an existing vault, the assets will be transferred to the vault.
 
 
 ## Timeline
