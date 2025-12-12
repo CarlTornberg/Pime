@@ -1,11 +1,11 @@
 use pinocchio::{ProgramResult, program_error::ProgramError};
-use crate::states::Transmutable;
+use crate::{errors::PimeError, states::Transmutable};
 mod unpack;
 
 /// Packs a vault to its byte format.
 pub fn serialize<T: Transmutable + Sized>(data: &T, buf: &mut [u8]) -> ProgramResult{
     if buf.len() != size_of::<T>() {
-        return Err(ProgramError::Custom(67));
+        return Err(PimeError::Unserializeable.into());
     }
     buf.copy_from_slice(
         // # SAFETY Vault is Transmutable and of size T
@@ -21,7 +21,7 @@ pub fn serialize<T: Transmutable + Sized>(data: &T, buf: &mut [u8]) -> ProgramRe
 
 pub fn deserialize<T: Transmutable + Sized>(data: &[u8]) -> Result<&T, ProgramError> {
     if data.len() != size_of::<T>() {
-        return Err(ProgramError::Custom(67));
+        return Err(PimeError::Undeserializeable.into());
     }
     // # SAFETY : Data is of length T and is Transmutable
     Ok(unsafe { &*(data.as_ptr() as *const T) })
