@@ -6,13 +6,14 @@ pub enum PimeInstruction {
 
     /// Creates a new vault.
     ///
+    ///
     /// Accounts expected by this instruction:
     ///
-    ///   0. `[signer]` The authority of the new vault
-    ///   1. `[writeable]` The vault data account.
-    ///   2. `[writeable]` The vault account.
-    ///   3. `[]` The mint address of the vault. 
-    ///   4. `[]` The token program. 
+    ///   0. `[signer]`     The authority of the new vault
+    ///   1. `[writeable]`  The vault data account.
+    ///   2. `[writeable]`  The vault account.
+    ///   3. `[]`           The mint address of the vault. 
+    ///   4. `[]`           The token program. 
     ///
     /// Data expected by this instruction:
     ///
@@ -21,6 +22,23 @@ pub enum PimeInstruction {
     ///   - `u64` The number of withdraws allowed within a timeframe.
     ///   - `u64` The number of lamports allowed to be withdrawn within a timeframe.
     CreateVault = 0,
+
+    /// Deposit tokens to a vault
+    ///
+    ///
+    /// Accounts expected by this instruction:
+    ///
+    ///   0. `[signer]`     The signer, and authority of the token account. 
+    ///   1. `[writeable]`  The token account which the tokens will be withdrawn from
+    ///   1. `[writeable]`  The vault account.
+    ///   2. `[]`           The mint address of the vault. 
+    ///   3. `[]`           The token program. 
+    ///
+    /// Data expected by this instruction:
+    ///
+    ///   - `[u8; 32]`  The vault owners' public key.
+    ///   - `u64`       The vault's vault's index.
+    ///   - `u64`       The amount to transfer in lamports (without decimals).
     DepositToVault = 1,
     WithdrawFromVault = 2,
     CloseVault = 3,
@@ -39,4 +57,4 @@ impl TryFrom<u8> for PimeInstruction {
     }
 }
 
-// TODO! Perform exhaustive convertion tests.
+// TODO! Perform exhaustive conversion tests.

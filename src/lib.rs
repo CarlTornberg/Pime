@@ -5,10 +5,13 @@ use pinocchio::{
 };
 use pinocchio_pubkey::declare_id;
 
+use crate::interface::pime_instruction::PimeInstruction;
+
 pub mod interface;
 mod processors;
 pub mod shared;
 pub mod states;
+pub mod errors;
 
 program_entrypoint!(process_instruction);
 default_allocator!();
@@ -32,6 +35,10 @@ pub fn process_instruction(
         0 => {
             msg!("Create vault");
             processors::create_vault::process_create_vault(accounts, data)?
+        },
+        1 => {
+            msg!("Deposit");
+            processors::deposit_to_vault::process_deposit_to_vault(accounts, data)?
         },
         _ => {return Err(ProgramError::InvalidInstructionData);}
         
