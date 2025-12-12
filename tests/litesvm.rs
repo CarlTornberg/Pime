@@ -5,13 +5,99 @@ mod litesvm_tests {
 
     use litesvm::LiteSVM;
     use pime::interface::instructions::create_vault_instruction::CreateVaultInstructionData;
+    use pime::interface::instructions::deposit_to_vault_instruction::DepositToVaultInstructionData;
     use pime::shared;
     use pime::states::Vault;
     use solana_sdk::message::{AccountMeta, Instruction};
-    use solana_sdk::program_error::ProgramError;
     use solana_sdk::{message::Message, native_token::LAMPORTS_PER_SOL, program_pack::Pack, pubkey::Pubkey, rent, signature::Keypair, signer::Signer, transaction::Transaction};
+    use spl_associated_token_account_interface::address::get_associated_token_address_with_program_id;
+    use spl_associated_token_account_interface::instruction::create_associated_token_account_idempotent;
     use spl_token_interface::state::Mint;
     use spl_token_interface::state::Account as TokenAccount;
+
+    const PIME_ID: Pubkey = Pubkey::new_from_array(pime::ID);
+    const TOKEN_PROGRAM: Pubkey = spl_token_interface::ID;
+
+    #[test]
+    fn alice_creates_vault() {
+        let mut svm = create_svm();
+        let alice = Keypair::new();
+        svm.airdrop(&alice.pubkey(), LAMPORTS_PER_SOL).unwrap();
+
+        let create_vault_instruction_data = CreateVaultInstructionData::new(
+            /* index */ 0u64, 
+            /* timeframe */ 1u64, 
+            /* max_withdraws */ 2u64, 
+            /* max_lamports */ 3u64,
+        );
+
+        // Create new mint
+        let mint = Keypair::new();
+        initialize_mint(&mut svm, &alice.pubkey(), &mint, &alice);
+
+        // Create vault based on the new mint
+        create_new_vault(&mut svm, &alice, &create_vault_instruction_data, &mint.pubkey());
+
+    }
+
+    #[test]
+    fn alice_deposits_to_vault() {
+        let mut svm = create_svm();
+        let alice = Keypair::new();
+        svm.airdrop(&alice.pubkey(), LAMPORTS_PER_SOL).unwrap();
+
+        let create_vault_instruction_data = CreateVaultInstructionData::new(
+            /* index */ 1u64, 
+            /* timeframe */ 2u64, 
+            /* max_withdraws */ 3u64, 
+            /* max_lamports */ 4u64,
+        );
+
+        // Create new mint
+        let mint = Keypair::new();
+        initialize_mint(
+            /* svm */ &mut svm, 
+            /* authority */ &alice.pubkey(), 
+            /* mint */ &mint, 
+            /* payer */ &alice);
+
+        // Create vault based on the new mint
+        create_new_vault(
+            /* svm */ &mut svm, 
+            /* authority */ &alice, 
+            /* instruction data */ &create_vault_instruction_data, 
+            /* mint */ &mint.pubkey()
+        );
+
+        let alice_ata = get_associated_token_address_with_program_id (
+            &alice.pubkey(), 
+            &mint.pubkey(), 
+            &TOKEN_PROGRAM);
+        let mint_amount = 10_000;
+        mint_to(
+            /* svm */ &mut svm,
+            /* mint */ &mint.pubkey(), 
+            /* mint authority */ &alice, 
+            /* to */ &alice.pubkey(),
+            /* to ata */ &alice_ata, 
+            /* payer */ &alice, 
+            /* amount */ mint_amount);
+
+        let deposit_amount = 4_000;
+        let deposit_inst = DepositToVaultInstructionData::new(
+            /* vault owner */ alice.pubkey().to_bytes(), 
+            /* index */ create_vault_instruction_data.index(), 
+            /* deposit amount */ deposit_amount);
+
+        deposit_to_vault(
+            &mut svm, 
+            /* from */ &alice_ata, 
+            /* from_authority */ &alice, 
+            &mint.pubkey(), 
+            &deposit_inst);
+    }
+    
+    // Helpers 
 
     fn create_svm() -> LiteSVM {
         let pime_program_path = Path::join(&current_dir().unwrap(), "target/sbpf-solana-solana/release/pime.so");
@@ -21,155 +107,72 @@ mod litesvm_tests {
         }
         svm
     }
-    const PIME_ID: Pubkey = Pubkey::new_from_array(pime::ID);
-
-    #[test]
-    fn alice_creates_vault() {
-        let mut svm = create_svm();
-
-        let token_program = spl_token_interface::ID;
-
-        let from_keypair = Keypair::new();
-        let from = from_keypair.pubkey();
-        let to = Pubkey::new_unique();
-
-        let create_vault_instruction_data = CreateVaultInstructionData::new(
-            /* index */ 0u64, 
-            /* timeframe */ 67u64, 
-            /* max_withdraws */ 5u64, 
-            /* max_lamports */ LAMPORTS_PER_SOL
-        );
-
-        // Create new mint
-        svm.airdrop(&from, LAMPORTS_PER_SOL).unwrap();
-        let mint = create_and_mint_to(
-            &mut svm, 
-            &from_keypair, 
-            &to, 
-            100_000, 
-            &token_program).unwrap();
-
-        // Create vault based on the new mint
-        let authority = Keypair::new();
-        svm.airdrop(&authority.pubkey(), LAMPORTS_PER_SOL).unwrap();
-        
-        create_new_vault(
-            &mut svm, 
-            &authority, 
-            &create_vault_instruction_data,
-            &mint, 
-            &token_program);
-
-    }
-
-    #[test]
-    fn alice_deposits_to_own_vault() {
-        let mut svm = create_svm();
-
-        let token_program = spl_token_interface::ID;
-
-        let from_keypair = Keypair::new();
-        let from = from_keypair.pubkey();
-        let to = Pubkey::new_unique();
-
-        let create_vault_instruction_data = CreateVaultInstructionData::new(
-            /* index */ 0u64, 
-            /* timeframe */ 67u64, 
-            /* max_withdraws */ 5u64, 
-            /* max_lamports */ LAMPORTS_PER_SOL
-        );
-
-        // Create new mint
-        svm.airdrop(&from, LAMPORTS_PER_SOL).unwrap();
-        let mint = create_and_mint_to(
-            &mut svm, 
-            &from_keypair, 
-            &to, 
-            100_000, 
-            &token_program).unwrap();
-
-        // Create vault based on the new mint
-        let authority = Keypair::new();
-        svm.airdrop(&authority.pubkey(), LAMPORTS_PER_SOL).unwrap();
-        
-        create_new_vault(
-            &mut svm, 
-            &authority, 
-            &create_vault_instruction_data,
-            &mint, 
-            &token_program);
-
-        // Deposit mint to new vault
-        todo!()
-    }
-
-
-
-    // Helpers 
-
-    /// Creates a new mint, and mints the token to the to account.
-    /// This function initializes the ATA of the to account.
-    ///
-    /// Returns the new mint address.
-    fn create_and_mint_to(svm: &mut LiteSVM, mint_authority: &Keypair, to: &Pubkey, mint_amount: u64, token_program: &Pubkey) -> Result<Pubkey, ProgramError> {
-        let mint = Keypair::new();
-        let to_ata = Pubkey::find_program_address(
-            &[
-                &to.to_bytes(),
-                &token_program.to_bytes(),
-                &mint.pubkey().to_bytes(),
-            ], 
-            &spl_associated_token_account_interface::program::ID);
+    
+    fn initialize_mint(svm: &mut LiteSVM, authority: &Pubkey, mint: &Keypair, payer: &Keypair) {
 
         let create_mint_account_inst = solana_system_interface::instruction::create_account(
-            /* from */ &mint_authority.pubkey(), 
+            /* from */ &payer.pubkey(), 
             /* to */ &mint.pubkey(),
             /* lamports */ svm.minimum_balance_for_rent_exemption(Mint::LEN),
             /* space */ Mint::LEN as u64,
-            /* owner */ token_program,
+            /* owner */ &TOKEN_PROGRAM,
         );
 
         let init_mint_inst = spl_token_interface::instruction::initialize_mint(
-            /* token program */ token_program, 
+            /* token program */ &TOKEN_PROGRAM, 
             /* mint */ &mint.pubkey(), 
-            /* mint authority */ &mint_authority.pubkey(), 
+            /* mint authority */ authority, 
             /* freeze authority */ None, 
             /* decimals */ 6,
-        )?;
-
-        let create_ata_inst = spl_associated_token_account_interface::instruction::create_associated_token_account(
-            /* funding address */ &mint_authority.pubkey(),
-            /* wallet_address */ to, 
-            /* token_mint_address */ &mint.pubkey(), 
-            /* token_program_id */ token_program);
-
-        let mint_to_inst = spl_token_interface::instruction::mint_to(
-            /* token program */ token_program,  
-            /* mint */ &mint.pubkey(), 
-            /* account */ &to_ata.0, 
-            /* owner */ &mint_authority.pubkey(), 
-            /* signer pubkeys */ &[&mint_authority.pubkey()], 
-            /* amount */ mint_amount 
-        )?;
+        ).unwrap();
 
         let tx = Transaction::new(
-            /* Signers */ &[mint_authority, &mint], 
+            /* Signers */ &[&payer, &mint], 
             Message::new(
                 &[
                     create_mint_account_inst,
-                    init_mint_inst,
-                    create_ata_inst,
-                    mint_to_inst,
+                    init_mint_inst
                 ],
-                /* Payer */ Some(&mint_authority.pubkey())
+                /* Payer */ Some(&payer.pubkey())
             ), 
             svm.latest_blockhash()
         );
-        let _ = svm.send_transaction(tx).unwrap();
-        let to_ata_account = svm.get_account(&to_ata.0).unwrap();
+
+        if let Err(e) = svm.send_transaction(tx) {
+            panic!("Failed to create mint: {:#?}", e);
+        }
+    }
+
+    fn mint_to(svm: &mut LiteSVM, mint: &Pubkey, mint_authority: &Keypair, to: &Pubkey, to_ata: &Pubkey, payer: &Keypair, amount: u64) {
+
+        let create_impo_inst = create_associated_token_account_idempotent(&payer.pubkey(), to, mint, &TOKEN_PROGRAM);
+
+        let mint_to_inst = spl_token_interface::instruction::mint_to(
+            /* token program */ &TOKEN_PROGRAM,  
+            /* mint */ mint, 
+            /* account */ to_ata, 
+            /* owner */ &mint_authority.pubkey(), 
+            /* signer pubkeys */ &[&mint_authority.pubkey()], 
+            /* amount */ amount 
+        ).unwrap();
+
+        let tx = Transaction::new(
+            /* Signers */ &[mint_authority, payer], 
+            Message::new(
+                &[
+                    create_impo_inst,
+                    mint_to_inst,
+                ],
+                /* Payer */ Some(&payer.pubkey())
+            ), 
+            svm.latest_blockhash()
+        );
+        if let Err(e) = svm.send_transaction(tx) {
+            panic!("Failed to mint: {:#?}", e);
+        }
+        let to_ata_account = svm.get_account(to_ata).unwrap();
         let to_ata_token_account = TokenAccount::unpack(&to_ata_account.data).unwrap();
-        assert_eq!(to_ata_token_account.amount, mint_amount);
-        Ok(mint.pubkey())
+        assert_eq!(to_ata_token_account.amount, amount);
     }
 
     fn create_new_vault(
@@ -177,17 +180,16 @@ mod litesvm_tests {
         authority: &Keypair, 
         instuction_data: &CreateVaultInstructionData,
         mint: &Pubkey, 
-        token_program: &Pubkey,) {
+    ) {
         let vault_data = find_vault_data_pda(
             &authority.pubkey(), 
             instuction_data.index(), 
             mint, 
-            token_program);
+            &TOKEN_PROGRAM);
         let vault = find_vault_pda(&vault_data.0);
 
         let mut data = [0; size_of::<CreateVaultInstructionData>()];
         shared::serialize(instuction_data, &mut data).unwrap();
-        println!("Create vault instruction data: {:?}", data);
 
         let create_vault_inst = Instruction::new_with_bytes(
             /* program id*/     PIME_ID, 
@@ -197,7 +199,7 @@ mod litesvm_tests {
                 AccountMeta::new(vault_data.0, false),
                 AccountMeta::new(vault.0, false),
                 AccountMeta::new_readonly(*mint, false),
-                AccountMeta::new_readonly(*token_program, false),
+                AccountMeta::new_readonly(TOKEN_PROGRAM, false),
                 AccountMeta::new_readonly(solana_system_interface::program::ID, false),
             ].to_vec()
         );
@@ -205,8 +207,8 @@ mod litesvm_tests {
         if let Err(e) = svm.send_transaction(Transaction::new(
             /* from keypairs */     &[&authority], 
             /* message */           Message::new(
-                /* instructions */  &[create_vault_inst],
-                /* payer */         Some(&authority.pubkey())),
+                /* instructions */      &[create_vault_inst],
+                /* payer */             Some(&authority.pubkey())),
             /* latest blockhash */  svm.latest_blockhash()
         )) {
             panic!("{:#?}", e);
@@ -218,6 +220,62 @@ mod litesvm_tests {
         assert_eq!(vault_acc.unwrap().timeframe(), instuction_data.timeframe());
         assert_eq!(vault_acc.unwrap().max_withdraws(), instuction_data.max_withdraws());
         assert_eq!(vault_acc.unwrap().max_lamports(), instuction_data.max_lamports());
+    }
+    
+    fn deposit_to_vault(svm: &mut LiteSVM, from_acc: &Pubkey, from_authority: &Keypair, mint: &Pubkey, inst: &DepositToVaultInstructionData) {
+        let mut buf = [0; size_of::<DepositToVaultInstructionData>()];
+        shared::serialize(inst, &mut buf).unwrap();
+        println!("deposit instruction inst index: {}, amount: {}", inst.index(), inst.amount());
+        println!("deposit instruction bytes {:?}", buf);
+
+        let vault_owner = Pubkey::new_from_array(inst.vault_owner());
+        let vault_data = find_vault_data_pda(&vault_owner, inst.index(), mint, &TOKEN_PROGRAM).0;
+        let vault = find_vault_pda(&vault_data).0;
+
+        let deposit_inst = Instruction::new_with_bytes(
+            PIME_ID,
+            buf.as_slice(), 
+            [
+                AccountMeta::new(from_authority.pubkey(), true),
+                AccountMeta::new(*from_acc, false),
+                AccountMeta::new(vault, false),
+                AccountMeta::new_readonly(*mint, false),
+                AccountMeta::new_readonly(TOKEN_PROGRAM, false),
+            ].to_vec());
+
+        let tx = Transaction::new(
+            &[&from_authority], 
+            Message::new(&[deposit_inst], Some(&from_authority.pubkey())), 
+            svm.latest_blockhash());
+        if let Err(e) = svm.send_transaction(tx) {
+            panic!(" Failed to deposit to vault using token interface: {:#?}", e);
+        }
+
+        let vault_acc = svm.get_account(&vault).unwrap();
+        let vault_token = TokenAccount::unpack(&vault_acc.data).unwrap();
+        assert_eq!(vault_token.amount, inst.amount());
+    }
+
+    fn deposit_to_vault_token_interface(svm: &mut LiteSVM, from_acc: &Pubkey, from_authority: &Keypair, vault: &Pubkey, amount: u64) {
+        let transfer_inst = spl_token_interface::instruction::transfer(
+            /* token program */ &TOKEN_PROGRAM, 
+            /* source_pubkey */ from_acc, 
+            /* destination_pubkey */ vault, 
+            /* authority_pubkey */ &from_authority.pubkey(), 
+            /* signer_pubkeys */ &[&from_authority.pubkey()], 
+            /* amount */ amount).unwrap();
+        
+        let tx = Transaction::new(
+            &[&from_authority], 
+            Message::new(&[transfer_inst], Some(&from_authority.pubkey())), 
+            svm.latest_blockhash());
+        if let Err(e) = svm.send_transaction(tx) {
+            panic!(" Failed to deposit to vault using token interface: {:#?}", e);
+        }
+
+        let vault_acc = svm.get_account(vault).unwrap();
+        let vault_token = TokenAccount::unpack(&vault_acc.data).unwrap();
+        assert_eq!(vault_token.amount, amount);
     }
 
     fn find_vault_data_pda(authority: &Pubkey, index: u64, mint: &Pubkey, token_program: &Pubkey) -> (Pubkey, u8) {
