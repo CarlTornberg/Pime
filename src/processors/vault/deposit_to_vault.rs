@@ -19,7 +19,7 @@ pub fn process_deposit_to_vault(accounts: &[AccountInfo], instruction_data: &[u8
     };
 
     // Extract accounts
-    let [from_authority, from, vault, mint, token_program, remaining @ ..] = accounts else {
+    let [from_authority, from, vault, mint, token_program, _remaining @ ..] = accounts else {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
 

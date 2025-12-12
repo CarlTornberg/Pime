@@ -9,7 +9,7 @@ mod litesvm_tests {
     use pime::shared;
     use pime::states::Vault;
     use solana_sdk::message::{AccountMeta, Instruction};
-    use solana_sdk::{message::Message, native_token::LAMPORTS_PER_SOL, program_pack::Pack, pubkey::Pubkey, rent, signature::Keypair, signer::Signer, transaction::Transaction};
+    use solana_sdk::{message::Message, native_token::LAMPORTS_PER_SOL, program_pack::Pack, pubkey::Pubkey, signature::Keypair, signer::Signer, transaction::Transaction};
     use spl_associated_token_account_interface::address::get_associated_token_address_with_program_id;
     use spl_associated_token_account_interface::instruction::create_associated_token_account_idempotent;
     use spl_token_interface::state::Mint;
@@ -305,28 +305,6 @@ mod litesvm_tests {
         let vault_acc = svm.get_account(&vault).unwrap();
         let vault_token = TokenAccount::unpack(&vault_acc.data).unwrap();
         assert_eq!(vault_token.amount, inst.amount());
-    }
-
-    fn deposit_to_vault_token_interface(svm: &mut LiteSVM, from_acc: &Pubkey, from_authority: &Keypair, vault: &Pubkey, amount: u64) {
-        let transfer_inst = spl_token_interface::instruction::transfer(
-            /* token program */ &TOKEN_PROGRAM, 
-            /* source_pubkey */ from_acc, 
-            /* destination_pubkey */ vault, 
-            /* authority_pubkey */ &from_authority.pubkey(), 
-            /* signer_pubkeys */ &[&from_authority.pubkey()], 
-            /* amount */ amount).unwrap();
-        
-        let tx = Transaction::new(
-            &[&from_authority], 
-            Message::new(&[transfer_inst], Some(&from_authority.pubkey())), 
-            svm.latest_blockhash());
-        if let Err(e) = svm.send_transaction(tx) {
-            panic!(" Failed to deposit to vault using token interface: {:#?}", e);
-        }
-
-        let vault_acc = svm.get_account(vault).unwrap();
-        let vault_token = TokenAccount::unpack(&vault_acc.data).unwrap();
-        assert_eq!(vault_token.amount, amount);
     }
 
     fn find_vault_data_pda(authority: &Pubkey, index: u64, mint: &Pubkey, token_program: &Pubkey) -> (Pubkey, u8) {

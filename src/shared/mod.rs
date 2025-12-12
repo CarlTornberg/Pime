@@ -1,6 +1,5 @@
 use pinocchio::{ProgramResult, program_error::ProgramError};
 use crate::{errors::PimeError, states::Transmutable};
-mod unpack;
 
 /// Packs a vault to its byte format.
 pub fn serialize<T: Transmutable + Sized>(data: &T, buf: &mut [u8]) -> ProgramResult{

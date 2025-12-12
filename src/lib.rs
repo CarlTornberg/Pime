@@ -5,8 +5,6 @@ use pinocchio::{
 };
 use pinocchio_pubkey::declare_id;
 
-use crate::interface::pime_instruction::PimeInstruction;
-
 pub mod interface;
 mod processors;
 pub mod shared;

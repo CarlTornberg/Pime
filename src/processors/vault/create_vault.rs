@@ -1,6 +1,5 @@
 use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, msg, program_error::ProgramError, pubkey::pubkey_eq, seeds};
-use pinocchio_token::state::TokenAccount;
-use crate::{errors::PimeError, interface::instructions::create_vault_instruction::CreateVaultInstructionData, processors, shared, states::{Vault, as_bytes}};
+use crate::{errors::PimeError, processors, states::{Vault, as_bytes}};
 
 /// Create new vault given a vault index, authority, mint (with corresponding token program), and
 /// settings.
