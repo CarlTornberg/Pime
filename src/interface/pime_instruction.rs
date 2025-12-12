@@ -14,6 +14,7 @@ pub enum PimeInstruction {
     ///   2. `[writeable]`  The vault account.
     ///   3. `[]`           The mint address of the vault. 
     ///   4. `[]`           The token program. 
+    ///   5. `[]`           The system program. 
     ///
     /// Data expected by this instruction:
     ///
@@ -33,6 +34,7 @@ pub enum PimeInstruction {
     ///   1. `[writeable]`  The vault account.
     ///   2. `[]`           The mint address of the vault. 
     ///   3. `[]`           The token program. 
+    ///   4. `[]`           The system program. (Optional, if vault needs to be initialized) 
     ///
     /// Data expected by this instruction:
     ///

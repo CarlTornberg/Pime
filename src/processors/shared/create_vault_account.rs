@@ -17,14 +17,16 @@ pub fn create_vault_account (
     let vault_bump = &[vault_bump];
     let vault_signer_seeds = seeds!( vault_data_pubkey, vault_bump );
 
+    msg!("Creating system account..");
     pinocchio_system::create_account_with_minimum_balance_signed(
             /* account */ vault, 
             /* space */ TokenAccount::LEN,
             /* owner */ token_program, 
             /* payer */ payer, 
             /* rent sysvar */ None,
-            /* signer seeds */ &[Signer::from(&vault_signer_seeds)],
+            /* signers */ &[Signer::from(&vault_signer_seeds)],
         )?;
+    msg!(" Account created, initializing..");
 
     pinocchio_token::instructions::InitializeAccount3 {
         account: vault,

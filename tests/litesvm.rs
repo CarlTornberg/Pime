@@ -96,6 +96,56 @@ mod litesvm_tests {
             &mint.pubkey(), 
             &deposit_inst);
     }
+
+    #[test]
+    fn alice_deposits_to_bobs_uninitialized_vault() {
+        let mut svm = create_svm();
+        let alice = Keypair::new();
+        let bob = Keypair::new();
+        svm.airdrop(&alice.pubkey(), LAMPORTS_PER_SOL).unwrap();
+
+        let create_vault_instruction_data = CreateVaultInstructionData::new(
+            /* index */ 1u64, 
+            /* timeframe */ 2u64, 
+            /* max_withdraws */ 3u64, 
+            /* max_lamports */ 4u64,
+        );
+
+        // Create new mint
+        let mint = Keypair::new();
+        initialize_mint(
+            /* svm */ &mut svm, 
+            /* authority */ &alice.pubkey(), 
+            /* mint */ &mint, 
+            /* payer */ &alice);
+
+        let alice_ata = get_associated_token_address_with_program_id (
+            &alice.pubkey(), 
+            &mint.pubkey(), 
+            &TOKEN_PROGRAM);
+        let mint_amount = 10_000;
+        mint_to(
+            /* svm */ &mut svm,
+            /* mint */ &mint.pubkey(), 
+            /* mint authority */ &alice, 
+            /* to */ &alice.pubkey(),
+            /* to ata */ &alice_ata, 
+            /* payer */ &alice, 
+            /* amount */ mint_amount);
+
+        let deposit_amount = 4_000;
+        let deposit_inst = DepositToVaultInstructionData::new(
+            /* vault owner */ bob.pubkey().to_bytes(), 
+            /* index */ create_vault_instruction_data.index(), 
+            /* deposit amount */ deposit_amount);
+
+        deposit_to_vault(
+            &mut svm, 
+            /* from */ &alice_ata, 
+            /* from_authority */ &alice, 
+            &mint.pubkey(), 
+            &deposit_inst);
+    }
     
     // Helpers 
 
@@ -241,6 +291,7 @@ mod litesvm_tests {
                 AccountMeta::new(vault, false),
                 AccountMeta::new_readonly(*mint, false),
                 AccountMeta::new_readonly(TOKEN_PROGRAM, false),
+                AccountMeta::new_readonly(solana_system_interface::program::ID, false),
             ].to_vec());
 
         let tx = Transaction::new(

@@ -48,7 +48,7 @@ pub fn process_deposit_to_vault(accounts: &[AccountInfo], instruction_data: &[u8
 
     if vault.lamports() == 0 {
         processors::shared::create_vault_account::create_vault_account(
-            /* payer */ from,
+            /* payer */ from_authority,
             /* vault */ vault,
             /* vault bump */ vault_pda.1,
             /* vault data pubkey */ &vault_data_pda.0,
