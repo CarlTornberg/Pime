@@ -37,6 +37,9 @@ This can enable you to take actions, both legally, but also controlling larger o
 Pime will not stop attacks from happen, but demotivate bad actors from targeting you as Pime lowers the Risk/Reward, similarly to how your house alarm works.
 Safety never prevents crime to happen, but give time for law enforcement to react, lowering the risk/reward. 
 
+### Value Proposition
+
+
 ### UX Requirements
 * Easy to use - A person why has little to no experience in Crypto should be able to understand and use it.
 * Clarity - Users shall understand the core concepts in a few sentences without requiring technical background.
