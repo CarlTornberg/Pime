@@ -58,6 +58,10 @@ Safety never prevents crime to happen, but give time for law enforcement to reac
 * Warm-up - Time until a withdraw can be made from a new cool-down is set.
 * Validity - Timeframe which something (like a transaction) is valid within.
 
+## Architecture Diagram
+![Architecture diagram](./figures/arch-diagram.svg)
+
+
 ## User Story
 ### General End State 
 A user is able to create new vaults. 
