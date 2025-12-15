@@ -7,7 +7,7 @@ mod litesvm_tests {
     use pime::interface::instructions::create_vault_instruction::CreateVaultInstructionData;
     use pime::interface::instructions::deposit_to_vault_instruction::DepositToVaultInstructionData;
     use pime::shared;
-    use pime::states::Vault;
+    use pime::states::{Vault, VaultHistory};
     use solana_sdk::message::{AccountMeta, Instruction};
     use solana_sdk::{message::Message, native_token::LAMPORTS_PER_SOL, program_pack::Pack, pubkey::Pubkey, signature::Keypair, signer::Signer, transaction::Transaction};
     use spl_associated_token_account_interface::address::get_associated_token_address_with_program_id;
@@ -238,6 +238,8 @@ mod litesvm_tests {
             &TOKEN_PROGRAM);
         let vault = find_vault_pda(&vault_data.0);
 
+        let max_transfers = instuction_data.max_transfers();
+
         let mut data = [0; size_of::<CreateVaultInstructionData>()];
         shared::serialize(instuction_data, &mut data).unwrap();
 
@@ -265,10 +267,11 @@ mod litesvm_tests {
         };
 
         let vault_data_bytes = svm.get_account(&vault_data.0).unwrap().data;
+        assert_eq!(vault_data_bytes.len(), size_of::<Vault>() + size_of::<VaultHistory>() * max_transfers as usize);
         // # SAFETY Data bytes are of type Vault
-        let vault_acc = unsafe { pime::states::from_bytes::<Vault>(&vault_data_bytes) };
+        let vault_acc = unsafe { pime::states::from_bytes::<Vault>(&vault_data_bytes[0.. size_of::<Vault>()]) };
         assert_eq!(vault_acc.unwrap().timeframe(), instuction_data.timeframe());
-        assert_eq!(vault_acc.unwrap().max_withdraws(), instuction_data.max_withdraws());
+        assert_eq!(vault_acc.unwrap().max_withdraws(), instuction_data.max_transfers());
         assert_eq!(vault_acc.unwrap().max_lamports(), instuction_data.max_lamports());
     }
     
