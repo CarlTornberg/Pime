@@ -1,6 +1,6 @@
 use pinocchio::{ProgramResult, account_info::AccountInfo, msg, program_error::ProgramError, pubkey::{Pubkey, pubkey_eq}};
 
-use crate::{errors::PimeError, interface::instructions::deposit_to_vault_instruction::DepositToVaultInstructionData, processors, states::Vault};
+use crate::{errors::PimeError, interface::instructions::deposit_to_vault_instruction::DepositToVaultInstructionData, processors, states::VaultData};
 
 pub fn process_deposit_to_vault(accounts: &[AccountInfo], instruction_data: &[u8]) -> ProgramResult {
 
@@ -31,12 +31,25 @@ pub fn process_deposit_to_vault(accounts: &[AccountInfo], instruction_data: &[u8
         return Err(ProgramError::MissingRequiredSignature);
     }
 
+    //      token program account checks
+
+    if !pubkey_eq(token_program.key(), &pinocchio_token::ID) {
+        return Err(PimeError::InvalidTokenProgram.into());
+    } 
+
+    //    Mint 
+    
+    if !mint.is_owned_by(token_program.key()) {
+        msg!("Mint is now owned by supplied token program.");
+        return Err(ProgramError::InvalidAccountOwner);
+    }
+
     //      vault data account checks
 
-    let vault_data_pda = Vault::get_vault_data_pda(vault_owner, index, mint.key(), token_program.key());
-    let vault_pda = Vault::get_vault_pda(&vault_data_pda.0);
+    let vault_data_pda = VaultData::get_vault_data_pda(vault_owner, index, mint.key(), token_program.key());
+    let vault_pda = VaultData::get_vault_pda(&vault_data_pda.0);
     if !pubkey_eq(&vault_pda.0, vault.key()) {
-        msg!("Invalid vault pubkey");
+        msg!("Invalid vault");
         return Err(PimeError::IncorrectPDA.into());
     }
 
@@ -57,15 +70,10 @@ pub fn process_deposit_to_vault(accounts: &[AccountInfo], instruction_data: &[u8
         )?;
     } 
     else if !vault.is_owned_by(&pinocchio_token::ID) {
-        msg!("Vault is not owned by a Token Program.");
+        msg!("Vault is not owned by the Token Program.");
         return Err(ProgramError::InvalidAccountOwner);
     }
 
-    //      token program account checks
-
-    if !pubkey_eq(token_program.key(), &pinocchio_token::ID) {
-        return Err(PimeError::InvalidTokenProgram.into());
-    } 
 
     // Token transfer from, to vault
     pinocchio_token::instructions::Transfer {

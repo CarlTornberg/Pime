@@ -1,4 +1,4 @@
-use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, msg, pubkey::Pubkey, seeds};
+use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, pubkey::Pubkey, seeds};
 use pinocchio_token::state::TokenAccount;
 
 /// Create the Vault Token Account.
@@ -12,12 +12,9 @@ pub fn create_vault_account (
     mint: &AccountInfo, 
     token_program: &Pubkey, 
 ) -> ProgramResult {
-    msg!("Creates vault");
-
     let vault_bump = &[vault_bump];
     let vault_signer_seeds = seeds!( vault_data_pubkey, vault_bump );
 
-    msg!("Creating system account..");
     pinocchio_system::create_account_with_minimum_balance_signed(
             /* account */ vault, 
             /* space */ TokenAccount::LEN,
@@ -26,7 +23,6 @@ pub fn create_vault_account (
             /* rent sysvar */ None,
             /* signers */ &[Signer::from(&vault_signer_seeds)],
         )?;
-    msg!(" Account created, initializing..");
 
     pinocchio_token::instructions::InitializeAccount3 {
         account: vault,
