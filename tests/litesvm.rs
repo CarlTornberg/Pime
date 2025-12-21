@@ -7,7 +7,7 @@ mod litesvm_tests {
     use pime::interface::instructions::create_vault_instruction::CreateVaultInstructionData;
     use pime::interface::instructions::deposit_to_vault_instruction::DepositToVaultInstructionData;
     use pime::shared;
-    use pime::states::{Vault, VaultHistory};
+    use pime::states::{VaultData, VaultHistory};
     use solana_sdk::message::{AccountMeta, Instruction};
     use solana_sdk::{message::Message, native_token::LAMPORTS_PER_SOL, program_pack::Pack, pubkey::Pubkey, signature::Keypair, signer::Signer, transaction::Transaction};
     use spl_associated_token_account_interface::address::get_associated_token_address_with_program_id;
@@ -26,7 +26,7 @@ mod litesvm_tests {
 
         let create_vault_instruction_data = CreateVaultInstructionData::new(
             /* index */ 0u64, 
-            /* timeframe */ 1u64, 
+            /* timeframe */ 1i64, 
             /* max_withdraws */ 2u64, 
             /* max_lamports */ 3u64,
         );
@@ -48,7 +48,7 @@ mod litesvm_tests {
 
         let create_vault_instruction_data = CreateVaultInstructionData::new(
             /* index */ 1u64, 
-            /* timeframe */ 2u64, 
+            /* timeframe */ 2i64, 
             /* max_withdraws */ 3u64, 
             /* max_lamports */ 4u64,
         );
@@ -106,7 +106,7 @@ mod litesvm_tests {
 
         let create_vault_instruction_data = CreateVaultInstructionData::new(
             /* index */ 1u64, 
-            /* timeframe */ 2u64, 
+            /* timeframe */ 2i64, 
             /* max_withdraws */ 3u64, 
             /* max_lamports */ 4u64,
         );
@@ -238,7 +238,7 @@ mod litesvm_tests {
             &TOKEN_PROGRAM);
         let vault = find_vault_pda(&vault_data.0);
 
-        let max_transfers = instuction_data.max_transfers();
+        let max_transactions = instuction_data.max_transactions();
 
         let mut data = [0; size_of::<CreateVaultInstructionData>()];
         shared::serialize(instuction_data, &mut data).unwrap();
@@ -267,12 +267,15 @@ mod litesvm_tests {
         };
 
         let vault_data_bytes = svm.get_account(&vault_data.0).unwrap().data;
-        assert_eq!(vault_data_bytes.len(), size_of::<Vault>() + size_of::<VaultHistory>() * max_transfers as usize);
+        assert_eq!(vault_data_bytes.len(), size_of::<VaultData>() + size_of::<VaultHistory>() * max_transactions as usize);
         // # SAFETY Data bytes are of type Vault
-        let vault_acc = unsafe { pime::states::from_bytes::<Vault>(&vault_data_bytes[0.. size_of::<Vault>()]) };
+        let vault_acc = unsafe { pime::states::from_bytes::<VaultData>(&vault_data_bytes[0.. size_of::<VaultData>()]) };
         assert_eq!(vault_acc.unwrap().timeframe(), instuction_data.timeframe());
-        assert_eq!(vault_acc.unwrap().max_withdraws(), instuction_data.max_transfers());
+        assert_eq!(vault_acc.unwrap().max_transactions(), instuction_data.max_transactions());
         assert_eq!(vault_acc.unwrap().max_lamports(), instuction_data.max_lamports());
+        for d in &vault_data_bytes[size_of::<VaultData>() ..] {
+            assert_eq!(*d, 0); // Check that transaction history bytes are 0'd out.
+        }
     }
     
     fn deposit_to_vault(svm: &mut LiteSVM, from_acc: &Pubkey, from_authority: &Keypair, mint: &Pubkey, inst: &DepositToVaultInstructionData) {
@@ -312,7 +315,7 @@ mod litesvm_tests {
 
     fn find_vault_data_pda(authority: &Pubkey, index: u64, mint: &Pubkey, token_program: &Pubkey) -> (Pubkey, u8) {
         Pubkey::find_program_address(&[
-            Vault::VAULT_DATA_SEED,
+            VaultData::VAULT_DATA_SEED,
             &authority.to_bytes(),
             &index.to_le_bytes(),
             &mint.to_bytes(),
