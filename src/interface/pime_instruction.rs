@@ -42,7 +42,23 @@ pub enum PimeInstruction {
     ///   - `u64`       The vault's vault's index.
     ///   - `u64`       The amount to transfer in lamports (without decimals).
     DepositToVault = 1,
+
+    /// Withdraw tokens to a vault
+    ///
+    ///
+    /// Accounts expected by this instruction:
+    ///
+    ///   0. `[signer]`     The owner of the vault.
+    ///   1. `[writeable]`  The vault data account.
+    ///   1. `[writeable]`  The vault account.
+    ///   2. `[]`           The mint address of the vault. 
+    ///   3. `[]`           The token program. 
+    ///
+    /// Data expected by this instruction:
+    ///
+    ///   - `u64`       The amount to withdraw in lamports (without decimals).
     WithdrawFromVault = 2,
+
     CloseVault = 3,
     BookTransfer = 4,
     ExecuteTransfer = 5,
