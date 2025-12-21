@@ -4,8 +4,13 @@ use pinocchio::program_error::ProgramError;
 pub enum PimeError {
     IncorrectPDA = 0,
     InvalidTokenProgram = 1,
-    Unserializeable = 2,
-    Undeserializeable = 3,
+    InvalidMintTokenProgram = 2,
+    Unserializeable = 3,
+    Undeserializeable = 4,
+    WithdrawLimitReachedTransactions,
+    WithdrawLimitReachedAmount,
+    AuthorityError,
+
 
     Unknown = u8::MAX,
 }
