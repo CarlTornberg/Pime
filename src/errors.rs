@@ -10,6 +10,7 @@ pub enum PimeError {
     WithdrawLimitReachedTransactions,
     WithdrawLimitReachedAmount,
     AuthorityError,
+    UnsupporedTokenProgram,
 
 
     Unknown = u8::MAX,
