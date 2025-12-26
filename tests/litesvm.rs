@@ -6,8 +6,9 @@ mod litesvm_tests {
     use litesvm::LiteSVM;
     use pime::interface::instructions::create_vault_instruction::CreateVaultInstructionData;
     use pime::interface::instructions::deposit_to_vault_instruction::DepositToVaultInstructionData;
+    use pime::interface::instructions::withdraw_from_vault::WithdrawFromVaultInstructionData;
     use pime::shared;
-    use pime::states::{VaultData, VaultHistory};
+    use pime::states::{VaultData, VaultHistory, as_bytes};
     use solana_sdk::message::{AccountMeta, Instruction};
     use solana_sdk::{message::Message, native_token::LAMPORTS_PER_SOL, program_pack::Pack, pubkey::Pubkey, signature::Keypair, signer::Signer, transaction::Transaction};
     use spl_associated_token_account_interface::address::get_associated_token_address_with_program_id;
@@ -97,11 +98,11 @@ mod litesvm_tests {
             &deposit_inst);
     }
 
+    
     #[test]
-    fn alice_deposits_to_bobs_uninitialized_vault() {
+    fn alice_withdraws_from_own_vault() {
         let mut svm = create_svm();
         let alice = Keypair::new();
-        let bob = Keypair::new();
         svm.airdrop(&alice.pubkey(), LAMPORTS_PER_SOL).unwrap();
 
         let create_vault_instruction_data = CreateVaultInstructionData::new(
@@ -119,10 +120,18 @@ mod litesvm_tests {
             /* mint */ &mint, 
             /* payer */ &alice);
 
+        // Create vault based on the new mint
+        create_new_vault(
+            /* svm */ &mut svm, 
+            /* authority */ &alice, 
+            /* instruction data */ &create_vault_instruction_data, 
+            /* mint */ &mint.pubkey()
+        );
+
         let alice_ata = get_associated_token_address_with_program_id (
-            &alice.pubkey(), 
-            &mint.pubkey(), 
-            &TOKEN_PROGRAM);
+            /* wallet address */ &alice.pubkey(), 
+            /* mint */ &mint.pubkey(), 
+            /* token program */ &TOKEN_PROGRAM);
         let mint_amount = 10_000;
         mint_to(
             /* svm */ &mut svm,
@@ -135,7 +144,7 @@ mod litesvm_tests {
 
         let deposit_amount = 4_000;
         let deposit_inst = DepositToVaultInstructionData::new(
-            /* vault owner */ bob.pubkey().to_bytes(), 
+            /* vault owner */ alice.pubkey().to_bytes(), 
             /* index */ create_vault_instruction_data.index(), 
             /* deposit amount */ deposit_amount);
 
@@ -145,8 +154,20 @@ mod litesvm_tests {
             /* from_authority */ &alice, 
             &mint.pubkey(), 
             &deposit_inst);
+
+        let withdraw_inst = WithdrawFromVaultInstructionData::new(
+            /* amount */ 100, 
+            /* vault index */ create_vault_instruction_data.index());
+
+        withdraw_from_vault(
+            /* svm */ &mut svm,
+            /* vault_authority */ &alice,
+            /* to */ &alice_ata,
+            /* mint */ &mint.pubkey(), 
+            /* token_program */ &TOKEN_PROGRAM, 
+            /* inst */ &withdraw_inst,
+        );
     }
-    
     // Helpers 
 
     fn create_svm() -> LiteSVM {
@@ -311,6 +332,48 @@ mod litesvm_tests {
         let vault_acc = svm.get_account(&vault).unwrap();
         let vault_token = TokenAccount::unpack(&vault_acc.data).unwrap();
         assert_eq!(vault_token.amount, inst.amount());
+    }
+
+
+    fn withdraw_from_vault(
+        svm: &mut LiteSVM, 
+        vault_authority: &Keypair, 
+        to: &Pubkey,
+        mint: &Pubkey, 
+        token_program: &Pubkey, 
+        inst: &WithdrawFromVaultInstructionData) {
+        let inst_bytes = as_bytes(inst);
+
+        let vault_data = find_vault_data_pda(
+            &vault_authority.pubkey(), 
+            inst.vault_index(), 
+            mint, 
+            token_program).0;
+        let vault = find_vault_pda(&vault_data).0;
+
+        let withdraw_inst = Instruction::new_with_bytes(
+            PIME_ID, 
+            inst_bytes, 
+            [
+                AccountMeta::new(vault_authority.pubkey(), true),
+                AccountMeta::new(vault_data, false),
+                AccountMeta::new(vault, false),
+                AccountMeta::new(*to, false),
+                AccountMeta::new_readonly(*mint, false),
+                AccountMeta::new_readonly(*token_program, false),
+            ].to_vec());
+
+        let tx = Transaction::new(
+            &[vault_authority], 
+            Message::new(
+                &[withdraw_inst], 
+                Some(&vault_authority.pubkey())
+            ), 
+            svm.latest_blockhash());
+
+        if let Err(e) = svm.send_transaction(tx) {
+            panic!("Failed to withdraw: {:#?}", e);
+        }
     }
 
     fn find_vault_data_pda(authority: &Pubkey, index: u64, mint: &Pubkey, token_program: &Pubkey) -> (Pubkey, u8) {
