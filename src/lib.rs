@@ -38,6 +38,10 @@ pub fn process_instruction(
             msg!("Deposit");
             processors::deposit_to_vault::process_deposit_to_vault(accounts, data)?
         },
+        2 => {
+            msg!("Withdraw");
+            processors::withdraw_from_vault::process_withdraw_from_vault(accounts, data)?
+        },
         _ => {return Err(ProgramError::InvalidInstructionData);}
         
     }
