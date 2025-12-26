@@ -1,8 +1,16 @@
-use pinocchio::{account_info::AccountInfo, msg, program_error::ProgramError, pubkey::pubkey_eq, sysvars::{Sysvar, clock::Clock}};
+use pinocchio::{account_info::AccountInfo, instruction::Signer, msg, program_error::ProgramError, pubkey::pubkey_eq, seeds, sysvars::{Sysvar, clock::Clock}};
 
 use crate::{errors::PimeError, shared::deserialize, states::{VaultData, VaultHistory}};
 
-pub fn transfer(authority: &AccountInfo, vault_data: &AccountInfo, vault: &AccountInfo, to: &AccountInfo, mint: &AccountInfo, token_program: &AccountInfo, amount: u64, vault_index: u64) -> Result<(), ProgramError> {
+pub fn transfer(
+    authority: &AccountInfo, 
+    vault_data: &AccountInfo, 
+    vault: &AccountInfo, 
+    to: &AccountInfo, 
+    mint: &AccountInfo, 
+    token_program: &AccountInfo, 
+    amount: u64, 
+    vault_index: u64) -> Result<(), ProgramError> {
     // Perform safety check
     
     //      Authority 
@@ -25,13 +33,21 @@ pub fn transfer(authority: &AccountInfo, vault_data: &AccountInfo, vault: &Accou
     //    Mint 
     
     if !mint.is_owned_by(token_program.key()) {
-        msg!("Mint is now owned by supplied token program.");
+        msg!("Mint is not owned by supplied token program.");
         return Err(ProgramError::InvalidAccountOwner);
+    }
+
+    //      To 
+
+    if to.lamports() == 0 {
+        msg!("Receiving account is not initialized.");
+        return Err(ProgramError::UninitializedAccount);
     }
 
     //      Vault Data
     
     if vault_data.lamports() == 0 {
+        msg!("Vault data is not initialized.");
         return Err(ProgramError::UninitializedAccount);
     }
 
@@ -59,7 +75,7 @@ pub fn transfer(authority: &AccountInfo, vault_data: &AccountInfo, vault: &Accou
         return Err(ProgramError::UninitializedAccount);
     }
 
-    if vault.is_owned_by(token_program.key()) {
+    if !vault.is_owned_by(token_program.key()) {
         msg!("Vault is not owned by the supplied token program.");
         return Err(ProgramError::InvalidAccountOwner);
     }
@@ -77,9 +93,9 @@ pub fn transfer(authority: &AccountInfo, vault_data: &AccountInfo, vault: &Accou
             size_of::<VaultData>())
     };
     let vault_data_desed = deserialize::<VaultData>(vault_data_bytes)?;
-    if pubkey_eq(&vault_data_desed.authority, authority.key()) { // Probably redundant as the authority needs to be signer, and vault is derived from the authority.
-        return Err(PimeError::AuthorityError.into());
-    }
+    // if pubkey_eq(&vault_data_desed.authority, authority.key()) { // Probably redundant as the authority needs to be signer, and vault is derived from the authority.
+    //     return Err(PimeError::AuthorityError.into());
+    // }
 
     let max_transactions = vault_data_desed.max_transactions() as usize;
     // SAFETY: Remaining bytes of vault data is represented as VaultHistory
@@ -113,10 +129,20 @@ pub fn transfer(authority: &AccountInfo, vault_data: &AccountInfo, vault: &Accou
         }
         else {
             // Found empty slot in the data.
+            let vault_bump = &[vault_pda.1];
+            let vault_signer_seeds = seeds!( &vault_data_pda.0, vault_bump );
+            return pinocchio_token::instructions::Transfer {
+                from: vault,
+                to, 
+                authority: vault,
+                amount
+            }.invoke_signed(&[Signer::from(&vault_signer_seeds)]);
         }
     }
 
     // No empty slot found
     Err(PimeError::WithdrawLimitReachedTransactions.into())
 }
+
+
 
