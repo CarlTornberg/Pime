@@ -129,6 +129,10 @@ pub fn transfer(
         }
         else {
             // Found empty slot in the data.
+            if tot_timeframe_amount + amount > max_lamports {
+                return Err(PimeError::WithdrawLimitReachedAmount.into());
+            }
+
             let vault_bump = &[vault_pda.1];
             let vault_signer_seeds = seeds!( &vault_data_pda.0, vault_bump );
             return pinocchio_token::instructions::Transfer {
@@ -143,6 +147,3 @@ pub fn transfer(
     // No empty slot found
     Err(PimeError::WithdrawLimitReachedTransactions.into())
 }
-
-
-
