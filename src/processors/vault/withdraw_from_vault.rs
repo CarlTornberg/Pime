@@ -1,6 +1,6 @@
-use pinocchio::{ProgramResult, account_info::AccountInfo, msg, program_error::ProgramError, pubkey::pubkey_eq};
+use pinocchio::{ProgramResult, account_info::AccountInfo, program_error::ProgramError};
 
-use crate::{errors::PimeError, interface::instructions::withdraw_from_vault::WithdrawFromVaultInstructionData, processors::shared, shared::deserialize, states::VaultData};
+use crate::{interface::instructions::withdraw_from_vault::WithdrawFromVaultInstructionData, processors::shared};
 
 pub fn process_withdraw_from_vault(accounts: &[AccountInfo], instrution_data: &[u8]) -> ProgramResult {
 
