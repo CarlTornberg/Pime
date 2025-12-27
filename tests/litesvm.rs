@@ -156,7 +156,7 @@ mod litesvm_tests {
             &deposit_inst);
 
         let withdraw_inst = WithdrawFromVaultInstructionData::new(
-            /* amount */ 100, 
+            /* amount */ 1, 
             /* vault index */ create_vault_instruction_data.index());
 
         withdraw_from_vault(
@@ -342,6 +342,7 @@ mod litesvm_tests {
         mint: &Pubkey, 
         token_program: &Pubkey, 
         inst: &WithdrawFromVaultInstructionData) {
+
         let inst_bytes = as_bytes(inst);
 
         let vault_data = find_vault_data_pda(
@@ -350,6 +351,12 @@ mod litesvm_tests {
             mint, 
             token_program).0;
         let vault = find_vault_pda(&vault_data).0;
+
+       let to_ata_account = TokenAccount::unpack(&svm.get_account(to).unwrap().data).unwrap();
+        let to_pre_amount = to_ata_account.amount;
+       let vault_account = TokenAccount::unpack(&svm.get_account(&vault).unwrap().data).unwrap();
+        let vault_pre_amount = vault_account.amount;
+
 
         let withdraw_inst = Instruction::new_with_bytes(
             PIME_ID, 
@@ -374,6 +381,12 @@ mod litesvm_tests {
         if let Err(e) = svm.send_transaction(tx) {
             panic!("Failed to withdraw: {:#?}", e);
         }
+
+       let to_ata_account = TokenAccount::unpack(&svm.get_account(to).unwrap().data).unwrap();
+       let vault_account = TokenAccount::unpack(&svm.get_account(&vault).unwrap().data).unwrap();
+
+        assert_eq!(to_pre_amount + inst.amount(), to_ata_account.amount);
+        assert_eq!(vault_account.amount, vault_pre_amount - inst.amount());
     }
 
     fn find_vault_data_pda(authority: &Pubkey, index: u64, mint: &Pubkey, token_program: &Pubkey) -> (Pubkey, u8) {
