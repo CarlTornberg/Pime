@@ -42,6 +42,10 @@ pub fn process_instruction(
             msg!("Withdraw");
             processors::withdraw_from_vault::process_withdraw_from_vault(accounts, data)?
         },
+        10 => {
+            msg!("Book transfer");
+            processors::transfer::book_transfer::process_book_transfer(accounts, data)?
+        },
         _ => {return Err(ProgramError::InvalidInstructionData);}
         
     }
