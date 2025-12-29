@@ -10,18 +10,24 @@ pub fn process_create_vault(accounts: &[AccountInfo], instruction_data: &[u8]) -
         index, 
         timeframe, 
         max_transactions, 
-        max_lamports, 
+        max_amount, 
+        transfer_min_warmup, 
+        tranfer_max_window, 
         ) = if instruction_data.len() >= 
     size_of::<u64>() + // vault index
     size_of::<i64>() + // time frame
     size_of::<u64>() + // max transactions (in the timeframe)
-    size_of::<u64>()   // max lamports (in the timeframe)
+    size_of::<u64>() + // max amount (in the timeframe)
+    size_of::<u64>() + // transfer min warmup 
+    size_of::<u64>()   // transfer max_window 
     {
         (
             u64::from_le_bytes(unsafe { *(instruction_data.as_ptr() as *const [u8; size_of::<u64>()]) }),
             i64::from_le_bytes(unsafe { *(instruction_data.as_ptr().add(size_of::<u64>()) as *const [u8; size_of::<u64>()]) }),
             u64::from_le_bytes(unsafe { *(instruction_data.as_ptr().add(size_of::<u64>() * 2) as *const [u8; size_of::<u64>()]) }),
             u64::from_le_bytes(unsafe { *(instruction_data.as_ptr().add(size_of::<u64>() * 3) as *const [u8; size_of::<u64>()]) }),
+            u64::from_le_bytes(unsafe { *(instruction_data.as_ptr().add(size_of::<u64>() * 4) as *const [u8; size_of::<u64>()]) }),
+            u64::from_le_bytes(unsafe { *(instruction_data.as_ptr().add(size_of::<u64>() * 5) as *const [u8; size_of::<u64>()]) }),
         )
     }
     else {
@@ -78,7 +84,9 @@ pub fn process_create_vault(accounts: &[AccountInfo], instruction_data: &[u8]) -
         vault_data,
         max_transactions,
         timeframe,
-        max_lamports,
+        max_amount,
+        transfer_min_warmup,
+        tranfer_max_window,
         Signer::from(&vault_data_signer_seeds),
     )?;
     

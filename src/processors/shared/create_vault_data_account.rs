@@ -8,6 +8,8 @@ pub(crate) fn process_create_vault_data_account(
     max_transactions: u64, 
     timeframe: i64, 
     max_lamports: u64, 
+    transfer_min_warmup: u64,
+    transfer_max_window: u64,
     vault_data_signer: Signer) -> Result<(), ProgramError> {
 
     let vault_data_size = size_of::<VaultData>() + (max_transactions as usize * size_of::<VaultHistory>());
@@ -32,7 +34,9 @@ pub(crate) fn process_create_vault_data_account(
             *authority.key(), 
             timeframe, 
             max_lamports, 
-            max_transactions
+            max_transactions,
+            transfer_min_warmup,
+            transfer_max_window,
         )));
 
     // Zero out the remaining data, which will be vault history.

@@ -30,6 +30,8 @@ mod litesvm_tests {
             /* timeframe */ 1i64, 
             /* max_withdraws */ 2u64, 
             /* max_lamports */ 3u64,
+            /* transfer min window */ 4u64,
+            /* transfer max_window */ 5u64,
         );
 
         // Create new mint
@@ -52,6 +54,8 @@ mod litesvm_tests {
             /* timeframe */ 2i64, 
             /* max_withdraws */ 3u64, 
             /* max_lamports */ 4u64,
+            /* transfer min window */ 4u64,
+            /* transfer max_window */ 5u64,
         );
 
         // Create new mint
@@ -110,6 +114,8 @@ mod litesvm_tests {
             /* timeframe */ 2i64, 
             /* max_withdraws */ 3u64, 
             /* max_lamports */ 4u64,
+            /* transfer min window */ 5u64,
+            /* transfer max_window */ 6u64,
         );
 
         // Create new mint

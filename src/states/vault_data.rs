@@ -7,8 +7,10 @@ pub struct VaultData {
     version: [u8; size_of::<u64>()],
     pub(crate) authority: Pubkey,
     timeframe: [u8; size_of::<i64>()],
-    max_lamports: [u8; size_of::<u64>()],
+    max_amount: [u8; size_of::<u64>()],
     max_transactions: [u8; size_of::<u64>()],
+    transfer_min_warmup: [u8; size_of::<u64>()],
+    transfer_max_window: [u8; size_of::<u64>()],
     transaction_index: [u8; size_of::<u64>()],
 }
 
@@ -20,14 +22,16 @@ impl VaultData {
     pub const VAULT_DATA_SEED: &[u8] = b"vault_data";
     pub const VAULT_STAKE_SEED: &[u8] = b"vault_stake";
 
-    pub fn new(authority: Pubkey, timeframe: i64, max_lamports: u64, max_transactions: u64) -> Self {
+    pub fn new(authority: Pubkey, timeframe: i64, max_amount: u64, max_transactions: u64, transfer_min_warmup: u64, transfer_max_window: u64) -> Self {
         Self { 
             discriminator: 0u8, 
             version: 1u64.to_le_bytes(), 
             authority, 
             timeframe: timeframe.to_le_bytes(), 
-            max_lamports: max_lamports.to_le_bytes(),
+            max_amount: max_amount.to_le_bytes(),
             max_transactions: max_transactions.to_le_bytes(),
+            transfer_min_warmup: transfer_min_warmup.to_le_bytes(),
+            transfer_max_window: transfer_max_window.to_le_bytes(),
             transaction_index: 0u64.to_le_bytes()
         }
     }
@@ -56,12 +60,12 @@ impl VaultData {
         self.max_transactions = val.to_le_bytes();
     }
 
-    pub fn max_lamports(&self) -> u64 {
-        u64::from_le_bytes(self.max_lamports)
+    pub fn max_amount(&self) -> u64 {
+        u64::from_le_bytes(self.max_amount)
     }
 
-    pub(crate) fn set_max_lamports(&mut self, val: &u64) {
-        self.max_lamports = val.to_le_bytes();
+    pub(crate) fn set_max_amount(&mut self, val: &u64) {
+        self.max_amount = val.to_le_bytes();
     }
 
     pub fn transaction_index(&self) -> u64 {
@@ -70,6 +74,22 @@ impl VaultData {
 
     pub fn set_transaction_index(&mut self, val: &u64) {
         self.transaction_index = val.to_le_bytes();
+    }
+
+    pub fn transfer_min_warmup(&self) -> u64 {
+        u64::from_le_bytes(self.transfer_min_warmup)
+    }
+
+    pub fn set_transfer_min_warmup(&mut self, val: &u64) {
+        self.transfer_min_warmup = val.to_le_bytes();
+    }
+
+    pub fn transfer_max_window(&self) -> u64 {
+        u64::from_le_bytes(self.transfer_max_window)
+    }
+
+    pub fn set_transfer_max_window(&mut self, val: &u64) {
+        self.transfer_max_window = val.to_le_bytes();
     }
 
     /// Calculates the vault data PDA with bump.
