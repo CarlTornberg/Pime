@@ -35,7 +35,7 @@ This is no different from how banks works today where a bank requires you to boo
 Understandably, if your wallet gets compromised it still can be drained, however at a limited rate.
 This can enable you to take actions, both legally, but also controlling larger outflows so that you can recover your assets.
 Pime will not stop attacks from happen, but demotivate bad actors from targeting you as Pime lowers the Risk/Reward, similarly to how your house alarm works.
-Safety never prevents crime to happen, but give time for law enforcement to react, lowering the risk/reward. 
+Safety never prevents crime to happen, but give time for you and law enforcement to react, lowering the risk/reward. 
 
 ### Value Proposition
 
