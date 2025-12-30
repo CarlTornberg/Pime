@@ -1,4 +1,4 @@
-use pinocchio::{account_info::AccountInfo, instruction::Signer, program_error::ProgramError};
+use pinocchio::{account_info::AccountInfo, instruction::Signer, program_error::ProgramError, sysvars::clock::UnixTimestamp};
 
 use crate::states::{VaultData, VaultHistory, as_bytes};
 
@@ -8,8 +8,8 @@ pub(crate) fn process_create_vault_data_account(
     max_transactions: u64, 
     timeframe: i64, 
     max_lamports: u64, 
-    transfer_min_warmup: u64,
-    transfer_max_window: u64,
+    transfer_min_warmup: UnixTimestamp,
+    transfer_max_window: UnixTimestamp,
     vault_data_signer: Signer) -> Result<(), ProgramError> {
 
     let vault_data_size = size_of::<VaultData>() + (max_transactions as usize * size_of::<VaultHistory>());
