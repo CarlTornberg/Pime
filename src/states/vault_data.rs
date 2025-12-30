@@ -1,4 +1,4 @@
-use pinocchio::{pubkey::{Pubkey, find_program_address}};
+use pinocchio::{pubkey::{Pubkey, find_program_address}, sysvars::clock::UnixTimestamp};
 use crate::states::Transmutable;
 
 #[repr(C)]
@@ -6,11 +6,11 @@ pub struct VaultData {
     pub(crate) discriminator: u8,
     version: [u8; size_of::<u64>()],
     pub(crate) authority: Pubkey,
-    timeframe: [u8; size_of::<i64>()],
+    timeframe: [u8; size_of::<UnixTimestamp>()],
     max_amount: [u8; size_of::<u64>()],
     max_transactions: [u8; size_of::<u64>()],
-    transfer_min_warmup: [u8; size_of::<u64>()],
-    transfer_max_window: [u8; size_of::<u64>()],
+    transfer_min_warmup: [u8; size_of::<UnixTimestamp>()],
+    transfer_max_window: [u8; size_of::<UnixTimestamp>()],
     transaction_index: [u8; size_of::<u64>()],
 }
 
@@ -22,7 +22,7 @@ impl VaultData {
     pub const VAULT_DATA_SEED: &[u8] = b"vault_data";
     pub const VAULT_STAKE_SEED: &[u8] = b"vault_stake";
 
-    pub fn new(authority: Pubkey, timeframe: i64, max_amount: u64, max_transactions: u64, transfer_min_warmup: u64, transfer_max_window: u64) -> Self {
+    pub fn new(authority: Pubkey, timeframe: i64, max_amount: u64, max_transactions: UnixTimestamp, transfer_min_warmup: UnixTimestamp, transfer_max_window: UnixTimestamp) -> Self {
         Self { 
             discriminator: 0u8, 
             version: 1u64.to_le_bytes(), 
@@ -44,11 +44,11 @@ impl VaultData {
         self.version = version.to_le_bytes();
     }
 
-    pub fn timeframe(&self) -> i64 {
-        i64::from_le_bytes(self.timeframe)
+    pub fn timeframe(&self) -> UnixTimestamp {
+        UnixTimestamp::from_le_bytes(self.timeframe)
     }
 
-    pub(crate) fn set_timeframe(&mut self, val: &u64) {
+    pub(crate) fn set_timeframe(&mut self, val: &UnixTimestamp) {
         self.timeframe = val.to_le_bytes();
     }
 
@@ -76,19 +76,19 @@ impl VaultData {
         self.transaction_index = val.to_le_bytes();
     }
 
-    pub fn transfer_min_warmup(&self) -> u64 {
-        u64::from_le_bytes(self.transfer_min_warmup)
+    pub fn transfer_min_warmup(&self) -> UnixTimestamp {
+        UnixTimestamp::from_le_bytes(self.transfer_min_warmup)
     }
 
-    pub fn set_transfer_min_warmup(&mut self, val: &u64) {
+    pub fn set_transfer_min_warmup(&mut self, val: &UnixTimestamp) {
         self.transfer_min_warmup = val.to_le_bytes();
     }
 
-    pub fn transfer_max_window(&self) -> u64 {
-        u64::from_le_bytes(self.transfer_max_window)
+    pub fn transfer_max_window(&self) -> UnixTimestamp {
+        UnixTimestamp::from_le_bytes(self.transfer_max_window)
     }
 
-    pub fn set_transfer_max_window(&mut self, val: &u64) {
+    pub fn set_transfer_max_window(&mut self, val: &UnixTimestamp) {
         self.transfer_max_window = val.to_le_bytes();
     }
 
