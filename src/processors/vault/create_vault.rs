@@ -1,4 +1,4 @@
-use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, msg, program_error::ProgramError, pubkey::pubkey_eq, seeds};
+use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, msg, program_error::ProgramError, pubkey::pubkey_eq, seeds, sysvars::clock::UnixTimestamp};
 use crate::{errors::PimeError, processors::shared, states::VaultData};
 
 /// Create new vault given a vault index, authority, mint (with corresponding token program), and
@@ -18,16 +18,16 @@ pub fn process_create_vault(accounts: &[AccountInfo], instruction_data: &[u8]) -
     size_of::<i64>() + // time frame
     size_of::<u64>() + // max transactions (in the timeframe)
     size_of::<u64>() + // max amount (in the timeframe)
-    size_of::<u64>() + // transfer min warmup 
-    size_of::<u64>()   // transfer max_window 
+    size_of::<UnixTimestamp>() + // transfer min warmup 
+    size_of::<UnixTimestamp>()   // transfer max_window 
     {
         (
             u64::from_le_bytes(unsafe { *(instruction_data.as_ptr() as *const [u8; size_of::<u64>()]) }),
             i64::from_le_bytes(unsafe { *(instruction_data.as_ptr().add(size_of::<u64>()) as *const [u8; size_of::<u64>()]) }),
             u64::from_le_bytes(unsafe { *(instruction_data.as_ptr().add(size_of::<u64>() * 2) as *const [u8; size_of::<u64>()]) }),
             u64::from_le_bytes(unsafe { *(instruction_data.as_ptr().add(size_of::<u64>() * 3) as *const [u8; size_of::<u64>()]) }),
-            u64::from_le_bytes(unsafe { *(instruction_data.as_ptr().add(size_of::<u64>() * 4) as *const [u8; size_of::<u64>()]) }),
-            u64::from_le_bytes(unsafe { *(instruction_data.as_ptr().add(size_of::<u64>() * 5) as *const [u8; size_of::<u64>()]) }),
+            UnixTimestamp::from_le_bytes(unsafe { *(instruction_data.as_ptr().add(size_of::<u64>() * 4) as *const [u8; size_of::<UnixTimestamp>()]) }),
+            UnixTimestamp::from_le_bytes(unsafe { *(instruction_data.as_ptr().add(size_of::<u64>() * 5) as *const [u8; size_of::<UnixTimestamp>()]) }),
         )
     }
     else {
