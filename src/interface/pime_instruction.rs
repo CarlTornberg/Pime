@@ -59,10 +59,33 @@ pub enum PimeInstruction {
     ///   - `u64`       The amount to withdraw in lamports (without decimals).
     WithdrawFromVault = 2,
 
-    CloseVault = 3,
-    BookTransfer = 4,
-    ExecuteTransfer = 5,
-    UnbookTransfer = 6,
+    // CloseVault = 3,
+
+    /// Book a transfer.
+    ///
+    ///
+    /// Accounts expected by this instruction:
+    ///
+    ///   0. `[signer]`     The owner of the vault.
+    ///   1. `[writeable]`  The vault data account.
+    ///   1. `[writeable]`  The vault account.
+    ///   2. `[writeable]`  The transfer account.
+    ///   3. `[writeable]`  The deposit account.
+    ///   4. `[]`           The mint address of the vault/transfer. 
+    ///   5. `[]`           The token program. 
+    ///
+    /// Data expected by this instruction:
+    ///
+    ///   - `u64`       The amount to transfer (without decimals).
+    ///   - `u64`       The vault index.
+    ///   - `u64`       The transfer index.
+    ///   - `UnixTimestamp` Warmup period
+    ///   - `UnixTimestamp` Validity period
+    BookTransfer = 10,
+
+    ExecuteTransfer = 11,
+
+    UnbookTransfer = 12,
 }
 
 impl TryFrom<u8> for PimeInstruction {
