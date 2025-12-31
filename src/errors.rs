@@ -11,6 +11,8 @@ pub enum PimeError {
     WithdrawLimitReachedAmount,
     AuthorityError,
     UnsupporedTokenProgram,
+    VaultWarmupViolation,
+
 
 
     Unknown = u8::MAX,
