@@ -7,6 +7,7 @@ pub struct TransferData {
     pub discriminator: u8,
     version: [u8; size_of::<u64>()],
     pub vault_data: Pubkey,
+    pub destination: Pubkey,
     amount: [u8; size_of::<UnixTimestamp>()],
     created: [u8; size_of::<UnixTimestamp>()],
     created_epoch: [u8; size_of::<Epoch>()],
@@ -18,12 +19,13 @@ impl TransferData {
     // pub const TRANSFER_SEED: &[u8] = b"transfer";
     // pub const DEPOSIT_SEED: &[u8] = b"deposit";
 
-    pub fn new(vault_data: Pubkey, amount: u64, warmup: UnixTimestamp, validity: UnixTimestamp) -> Result<Self, ProgramError> {
+    pub fn new(vault_data: Pubkey, amount: u64, destination: Pubkey, warmup: UnixTimestamp, validity: UnixTimestamp) -> Result<Self, ProgramError> {
         let clock = Clock::get()?;
         Ok(Self { discriminator: 10u8, 
             version: 0u64.to_le_bytes(),
             vault_data, 
             amount: amount.to_le_bytes(),
+            destination,
             created: clock.unix_timestamp.to_le_bytes(), 
             created_epoch: clock.epoch.to_le_bytes(),
             warmup: warmup.to_le_bytes(), 

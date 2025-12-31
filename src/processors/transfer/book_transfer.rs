@@ -1,4 +1,4 @@
-use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, msg, program_error::ProgramError, pubkey::pubkey_eq, seeds, sysvars::{Sysvar, rent::Rent}};
+use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, msg, program_error::ProgramError, pubkey::{Pubkey, pubkey_eq}, seeds, sysvars::{Sysvar, rent::Rent}};
 use pinocchio_system::instructions::CreateAccount;
 use pinocchio_token::{instructions::Transfer, state::TokenAccount};
 
@@ -8,7 +8,7 @@ use crate::{errors::PimeError, processors::shared::create_deposit_account::creat
 pub fn process_book_transfer(accounts: &[AccountInfo], instrution_data: &[u8]) -> ProgramResult {
     
 
-    let (amount, vault_index, transfer_index, warmup, validity) = (1,2,3,4,5);
+    let (amount, destination, vault_index, transfer_index, warmup, validity) = (1, Pubkey::default(), 2,3,4,5);
 
     let [authority, vault_data, vault, transfer, deposit, mint, token_program, _remaining @ ..] = accounts else {
         return Err(ProgramError::NotEnoughAccountKeys);
@@ -111,7 +111,8 @@ pub fn process_book_transfer(accounts: &[AccountInfo], instrution_data: &[u8]) -
         .copy_from_slice(as_bytes(
             &TransferData::new(
                 /* vault data */ *vault_data.key(), 
-                /* amount */ amount, 
+                /* amount */ amount,
+                /* destination */ destination,
                 /* warm-up */ warmup, 
                 /* validity */ validity)?
         ));
