@@ -110,7 +110,7 @@ pub fn transfer(
     let now = Clock::get()?.unix_timestamp;
     let timeframe = vault_data_desed.timeframe();
     let mut tot_timeframe_amount = 0u64;
-    let max_lamports = vault_data_desed.max_lamports();
+    let max_amount = vault_data_desed.max_amount();
 
     for _ in 0..max_transactions {
         i += 1;
@@ -123,13 +123,13 @@ pub fn transfer(
 
         if now + timeframe < vault_history.timestamp() {
             tot_timeframe_amount += vault_history.amount();
-            if tot_timeframe_amount + amount > max_lamports {
+            if tot_timeframe_amount + amount > max_amount {
                 return Err(PimeError::WithdrawLimitReachedAmount.into());
             }
         }
         else {
             // Found empty slot in the data.
-            if tot_timeframe_amount + amount > max_lamports {
+            if tot_timeframe_amount + amount > max_amount {
                 return Err(PimeError::WithdrawLimitReachedAmount.into());
             }
 
