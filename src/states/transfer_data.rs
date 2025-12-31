@@ -1,5 +1,7 @@
 use pinocchio::{program_error::ProgramError, pubkey::{Pubkey, find_program_address}, sysvars::{Sysvar, clock::{Clock, Epoch, UnixTimestamp}}};
 
+use crate::states::Transmutable;
+
 #[repr(C)]
 pub struct TransferData {
     pub discriminator: u8,
@@ -7,7 +9,7 @@ pub struct TransferData {
     pub vault_data: Pubkey,
     amount: [u8; size_of::<UnixTimestamp>()],
     created: [u8; size_of::<UnixTimestamp>()],
-    create_epoch: [u8; size_of::<Epoch>()],
+    created_epoch: [u8; size_of::<Epoch>()],
     warmup: [u8; size_of::<UnixTimestamp>()],
     validity: [u8; size_of::<UnixTimestamp>()],
 }
@@ -23,7 +25,7 @@ impl TransferData {
             vault_data, 
             amount: amount.to_le_bytes(),
             created: clock.unix_timestamp.to_le_bytes(), 
-            create_epoch: clock.epoch.to_le_bytes(),
+            created_epoch: clock.epoch.to_le_bytes(),
             warmup: warmup.to_le_bytes(), 
             validity: validity.to_le_bytes()
         })
@@ -50,3 +52,7 @@ impl TransferData {
         find_program_address(seeds, program_id)
     }
 }
+
+/// # SAFETY
+/// Struct does not contain padding.
+unsafe impl Transmutable for TransferData { }

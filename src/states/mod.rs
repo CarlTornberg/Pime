@@ -1,4 +1,5 @@
 mod vault_data;
+pub mod transfer_data;
 use pinocchio::program_error::ProgramError;
 pub use vault_data::*;
 
