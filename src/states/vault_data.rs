@@ -22,7 +22,7 @@ impl VaultData {
     pub const VAULT_DATA_SEED: &[u8] = b"vault_data";
     pub const VAULT_STAKE_SEED: &[u8] = b"vault_stake";
 
-    pub fn new(authority: Pubkey, timeframe: i64, max_amount: u64, max_transactions: UnixTimestamp, transfer_min_warmup: UnixTimestamp, transfer_max_window: UnixTimestamp) -> Self {
+    pub fn new(authority: Pubkey, timeframe: i64, max_amount: u64, max_transactions: u64, transfer_min_warmup: UnixTimestamp, transfer_max_window: UnixTimestamp) -> Self {
         Self { 
             discriminator: 0u8, 
             version: 1u64.to_le_bytes(), 
@@ -100,7 +100,7 @@ impl VaultData {
     /// This enabled additional fine grained control over an asset.
     pub fn get_vault_data_pda(authority: &Pubkey, index: u64, mint: &Pubkey, token_program: &Pubkey) -> (Pubkey, u8) {
         let program_id = &crate::ID;
-        let seeds = &[
+        let seeds: &[&[u8]] = &[
             VaultData::VAULT_DATA_SEED,
             authority,
             &index.to_le_bytes(),
