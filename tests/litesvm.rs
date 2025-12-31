@@ -299,7 +299,7 @@ mod litesvm_tests {
         let vault_acc = unsafe { pime::states::from_bytes::<VaultData>(&vault_data_bytes[0.. size_of::<VaultData>()]) };
         assert_eq!(vault_acc.unwrap().timeframe(), instuction_data.timeframe());
         assert_eq!(vault_acc.unwrap().max_transactions(), instuction_data.max_transactions());
-        assert_eq!(vault_acc.unwrap().max_lamports(), instuction_data.max_lamports());
+        assert_eq!(vault_acc.unwrap().max_amount(), instuction_data.max_amount());
         for d in &vault_data_bytes[size_of::<VaultData>() ..] {
             assert_eq!(*d, 0); // Check that transaction history bytes are 0'd out.
         }
