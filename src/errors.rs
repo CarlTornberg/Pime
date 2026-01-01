@@ -12,6 +12,7 @@ pub enum PimeError {
     AuthorityError,
     UnsupporedTokenProgram,
     VaultWarmupViolation,
+    DestinationMismatch,
 
 
 
