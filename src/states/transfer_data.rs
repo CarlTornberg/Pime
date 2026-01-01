@@ -33,6 +33,10 @@ impl TransferData {
         })
     }
 
+    pub fn amount(&self) -> u64 {
+        u64::from_le_bytes(self.amount)
+    }
+
     // Get the transfer's PDA.
     // Derived from the vault_data
     pub fn get_transfer_pda(vault_data: &Pubkey, transfer_index: &u64) -> (Pubkey, u8) {
