@@ -43,7 +43,7 @@ pub fn process_book_transfer(accounts: &[AccountInfo], instrution_data: &[u8]) -
     // SAFETY: Vault data is read-only and is of enough bytes. 
     let vault_data_account = unsafe { from_bytes::<VaultData>(vault.borrow_data_unchecked()) }?;
     if vault_data_account.transfer_min_warmup() > warmup {
-        msg!("The instructed warm-up violated the vaults min warm-up.");
+        msg!("The instructed warm-up violates the vaults min warm-up.");
         return Err(PimeError::VaultWarmupViolation.into());
     }
 
@@ -102,8 +102,8 @@ pub fn process_book_transfer(accounts: &[AccountInfo], instrution_data: &[u8]) -
         lamports: Rent::get()?.minimum_balance(size_of::<TransferData>()),
         space: size_of::<TransferData>() as u64,
         owner: &crate::ID,
-    }.invoke();
-    // SAFETY: Data is not previously borrowed and is represented by a valid format.
+    }.invoke()?;
+    // SAFETY: Data is not previously borrowed and has the Transmutable trait.
     unsafe {
         core::slice::from_raw_parts_mut(
             transfer.data_ptr(), 
