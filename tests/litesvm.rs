@@ -186,6 +186,11 @@ mod litesvm_tests {
         let mint_amount = 1_000;
 
         // Mint tokens
+        initialize_mint(
+            /* svm */ &mut svm, 
+            /* authority */ &alice.pubkey(), 
+            /* mint */ &mint, 
+            /* payer */ &alice);
         mint_to(&mut svm, 
             /* mint */ &mint.pubkey(), 
             /* mint_authority */ &alice, 
