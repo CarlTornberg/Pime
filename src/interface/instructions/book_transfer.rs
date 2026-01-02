@@ -28,6 +28,14 @@ impl BookTransferInstructionData {
             validity: validity.to_le_bytes(),
         }
     }
+
+    pub fn vault_index(&self) -> u64 {
+        u64::from_le_bytes(self.vault_index)
+    }
+
+    pub fn transfer_index(&self) -> u64 {
+        u64::from_le_bytes(self.transfer_index)
+    }
 }
 
 /// # SAFETY : 
