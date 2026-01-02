@@ -5,10 +5,33 @@ use pinocchio_token::{instructions::Transfer, state::TokenAccount};
 use crate::{errors::PimeError, processors::shared::create_deposit_account::create_deposit_account, states::{VaultData, as_bytes, from_bytes, transfer_data::TransferData}};
 
 /// Books a transfer and stores the assets in a temporary vault.
-pub fn process_book_transfer(accounts: &[AccountInfo], instrution_data: &[u8]) -> ProgramResult {
-    
+pub fn process_book_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) -> ProgramResult {
 
-    let (amount, destination, vault_index, transfer_index, warmup, validity) = (1, Pubkey::default(), 2,3,4,5);
+    if instruction_data.len() < 
+        size_of::<u64>() * 5 +
+        size_of::<Pubkey>() {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+
+    // SAFETY: instruction data is long enough
+    let (amount, destination, vault_index, transfer_index, warmup, validity) = unsafe { (
+        u64::from_le_bytes( *(instruction_data.as_ptr() as *const [u8; size_of::<u64>()])), 
+        &*(instruction_data.as_ptr().add(size_of::<u64>()) as *const Pubkey), 
+        u64::from_le_bytes( *(instruction_data.as_ptr().add(size_of::<Pubkey>() + size_of::<u64>()) as *const [u8; size_of::<u64>()])),
+        u64::from_le_bytes( *(instruction_data.as_ptr().add(size_of::<Pubkey>() + 2 * size_of::<u64>()) as *const [u8; size_of::<u64>()])),
+        i64::from_le_bytes( *(instruction_data.as_ptr().add(size_of::<Pubkey>() + 2 * size_of::<u64>() + size_of::<i64>()) as *const [u8; size_of::<u64>()])),
+        i64::from_le_bytes( *(instruction_data.as_ptr().add(size_of::<Pubkey>() + 2 * size_of::<u64>() + 2 * size_of::<i64>()) as *const [u8; size_of::<u64>()])),
+    ) 
+    };
+
+    if warmup < 0 {
+        msg!("Warm-up must be positive.");
+        return Err(ProgramError::InvalidInstructionData);
+    }
+    if validity < 0 {
+        msg!("Validity must be positive.");
+        return Err(ProgramError::InvalidInstructionData);
+    }
 
     let [authority, vault_data, vault, transfer, deposit, mint, token_program, _remaining @ ..] = accounts else {
         return Err(ProgramError::NotEnoughAccountKeys);
@@ -112,7 +135,7 @@ pub fn process_book_transfer(accounts: &[AccountInfo], instrution_data: &[u8]) -
             &TransferData::new(
                 /* vault data */ *vault_data.key(), 
                 /* amount */ amount,
-                /* destination */ destination,
+                /* destination */ *destination,
                 /* warm-up */ warmup, 
                 /* validity */ validity)?
         ));
