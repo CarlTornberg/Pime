@@ -1,4 +1,4 @@
-use pinocchio::sysvars::clock::UnixTimestamp;
+use pinocchio::{pubkey::Pubkey, sysvars::clock::UnixTimestamp};
 
 use crate::{interface::pime_instruction::PimeInstruction, states::Transmutable};
 
@@ -10,7 +10,8 @@ use crate::{interface::pime_instruction::PimeInstruction, states::Transmutable};
 #[repr(C)]
 pub struct BookTransferInstructionData {
     pub discriminator: u8,
-    amount: [u8; size_of::<i64>()],
+    amount: [u8; size_of::<u64>()],
+    destination: Pubkey,
     vault_index: [u8; size_of::<u64>()],
     transfer_index: [u8; size_of::<u64>()],
     warmup: [u8; size_of::<UnixTimestamp>()],
@@ -18,10 +19,11 @@ pub struct BookTransferInstructionData {
 }
 
 impl BookTransferInstructionData {
-    pub fn new(amount: u64, vault_index: u64, transfer_index: u64, warmup: UnixTimestamp, validity: UnixTimestamp) -> Self{
+    pub fn new(amount: u64, destination: Pubkey, vault_index: u64, transfer_index: u64, warmup: UnixTimestamp, validity: UnixTimestamp) -> Self{
         Self { 
             discriminator: PimeInstruction::BookTransfer as u8, 
             amount: amount.to_le_bytes(),
+            destination,
             vault_index: vault_index.to_le_bytes(),
             transfer_index: transfer_index.to_le_bytes(),
             warmup: warmup.to_le_bytes(),
