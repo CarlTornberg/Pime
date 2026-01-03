@@ -73,15 +73,16 @@ pub enum PimeInstruction {
     ///   3. `[writeable]`  The deposit account.
     ///   4. `[]`           The mint address of the vault/transfer. 
     ///   5. `[]`           The token program. 
+    ///   6. `[]`           The system program. 
     ///
     /// Data expected by this instruction:
     ///
     ///   - `u64`       The amount to transfer (without decimals).
+    ///   - `Pubkey`    Destination account.
     ///   - `u64`       The vault index.
     ///   - `u64`       The transfer index.
     ///   - `UnixTimestamp` Warmup period
     ///   - `UnixTimestamp` Validity period
-    ///   - `Pubkey`    Destination account.
     BookTransfer = 10,
 
     /// Execute a transfer.
