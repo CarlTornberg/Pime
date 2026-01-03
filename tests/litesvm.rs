@@ -604,7 +604,7 @@ mod litesvm_tests {
         assert_eq!(vault_acc.amount, vault_acc_pre_val - inst_data.amount()); 
 
         // Check that the tokens has been sent to the deposit account.
-        assert_eq!(deposit_acc.amount, inst_data.amount());
+        assert_eq!(deposit_acc.amount, deposit_acc_pre_val + inst_data.amount());
     }
 
     fn find_vault_data_pda(authority: &Pubkey, index: u64, mint: &Pubkey, token_program: &Pubkey) -> (Pubkey, u8) {
