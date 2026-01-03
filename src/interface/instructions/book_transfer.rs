@@ -31,6 +31,10 @@ impl BookTransferInstructionData {
         }
     }
 
+    pub fn amount(&self) -> u64 {
+         u64::from_le_bytes(self.amount)
+    }
+
     pub fn vault_index(&self) -> u64 {
         u64::from_le_bytes(self.vault_index)
     }
