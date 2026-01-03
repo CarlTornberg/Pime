@@ -2,14 +2,12 @@ use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, m
 use pinocchio_system::instructions::CreateAccount;
 use pinocchio_token::{instructions::Transfer, state::TokenAccount};
 
-use crate::{errors::PimeError, processors::shared::create_deposit_account::create_deposit_account, states::{VaultData, as_bytes, from_bytes, transfer_data::TransferData}};
+use crate::{errors::PimeError, interface::instructions::book_transfer::BookTransferInstructionData, processors::shared::create_deposit_account::create_deposit_account, states::{VaultData, as_bytes, from_bytes, transfer_data::TransferData}};
 
 /// Books a transfer and stores the assets in a temporary vault.
 pub fn process_book_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) -> ProgramResult {
 
-    if instruction_data.len() < 
-        size_of::<u64>() * 5 +
-        size_of::<Pubkey>() {
+    if instruction_data.len() < size_of::<BookTransferInstructionData>() - size_of::<u8>() {
         return Err(ProgramError::InvalidInstructionData);
     }
 
@@ -55,7 +53,7 @@ pub fn process_book_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) 
         msg!("Vault data is not initialized.");
         return Err(ProgramError::UninitializedAccount);
     }
-    if vault_data.is_owned_by(&crate::ID) {
+    if !vault_data.is_owned_by(&crate::ID) {
         msg!("Vault data account is not owned by this program.");
         return Err(ProgramError::IllegalOwner);
     }
@@ -64,8 +62,9 @@ pub fn process_book_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) 
         return Err(ProgramError::AccountDataTooSmall);
     }
     // SAFETY: Vault data is read-only and is of enough bytes. 
-    let vault_data_account = unsafe { from_bytes::<VaultData>(vault.borrow_data_unchecked()) }?;
-    if vault_data_account.transfer_min_warmup() > warmup {
+    let vault_data_account = 
+    unsafe { from_bytes::<VaultData>(&vault_data.borrow_data_unchecked()[..size_of::<VaultData>()]) }?;
+    if vault_data_account.transfer_min_warmup() < warmup {
         msg!("The instructed warm-up violates the vaults min warm-up.");
         return Err(PimeError::VaultWarmupViolation.into());
     }
@@ -79,8 +78,8 @@ pub fn process_book_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) 
         msg!("Vault is not initialized.");
         return Err(ProgramError::UninitializedAccount);
     }
-    if vault.is_owned_by(&crate::ID) {
-        msg!("Vault account is not owned by this program.");
+    if !vault.is_owned_by(token_program.key()) {
+        msg!("Vault account is not owned by the supplied token program.");
         return Err(ProgramError::IllegalOwner);
     }
     if vault.data_len() < TokenAccount::LEN {
@@ -99,10 +98,6 @@ pub fn process_book_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) 
         msg!("A transfer is already booked.");
         return Err(ProgramError::AccountAlreadyInitialized);
     }
-    if !transfer.is_owned_by(&crate::ID) {
-        msg!("Transfer account is not owned by this program.");
-        return Err(ProgramError::IllegalOwner);
-    }
 
     let deposit_pda = TransferData::get_deposit_pda(transfer.key());
     if !pubkey_eq(deposit.key(), &deposit_pda.0) {
@@ -113,19 +108,18 @@ pub fn process_book_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) 
         msg!("The deposit is already in use");
         return Err(ProgramError::AccountAlreadyInitialized);
     }
-    if !deposit.is_owned_by(token_program.key()) {
-        msg!("Deposit is not owned by the provided token program.");
-        return Err(ProgramError::InvalidAccountOwner);
-    }
 
     //      Create transfer account and assign data
+    let transfer_bump = &[transfer_pda.1];
+    let transfer_index_bytes = transfer_index.to_le_bytes();
+    let transfer_seed = seeds!(&vault_data_pda.0, &transfer_index_bytes, transfer_bump);
     CreateAccount {
         from: authority,
         to: transfer,
         lamports: Rent::get()?.minimum_balance(size_of::<TransferData>()),
         space: size_of::<TransferData>() as u64,
         owner: &crate::ID,
-    }.invoke()?;
+    }.invoke_signed(&[Signer::from(&transfer_seed)])?;
     // SAFETY: Data is not previously borrowed and has the Transmutable trait.
     unsafe {
         core::slice::from_raw_parts_mut(
