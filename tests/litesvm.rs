@@ -256,6 +256,83 @@ mod litesvm_tests {
         assert_eq!(deposit_acc.amount, transfer_amount);
 
     }
+
+    #[test]
+    fn alice_executes_transfer() {
+        let mut svm = create_svm();
+        let alice = Keypair::new();
+        svm.airdrop(&alice.pubkey(), LAMPORTS_PER_SOL).unwrap();
+        let mint = Keypair::new();
+        let alice_ata = get_associated_token_address(&alice.pubkey(), &mint.pubkey());
+
+        let receiver = Keypair::new();
+        let receiver_ata = get_associated_token_address(&receiver.pubkey(), &mint.pubkey());
+
+        let mint_amount = 1_000;
+
+        // Mint tokens
+        initialize_mint(
+            /* svm */ &mut svm, 
+            /* authority */ &alice.pubkey(), 
+            /* mint */ &mint, 
+            /* payer */ &alice);
+        mint_to(&mut svm, 
+            /* mint */ &mint.pubkey(), 
+            /* mint_authority */ &alice, 
+            /* to */ &alice.pubkey(), 
+            /* to_ata */ &alice_ata, 
+            /* payer */ &alice, 
+            /* amount */ mint_amount);
+
+        // Create vault
+        let create_vault_inst_data = CreateVaultInstructionData::new(
+            /* index */ 1, 
+            /* timeframe */ 2, 
+            /* max_transactions */ 3, 
+            /* max_amount */ 4, 
+            /* transfer_min_warmup */ 5, 
+            /* transfer_max_window */ 6);
+        create_new_vault(&mut svm, 
+            /* authority */ &alice, 
+            /* instuction_data */ &create_vault_inst_data,  
+            /* mint */ &mint.pubkey()
+        );
+
+        // Deposit to vault
+        let deposit_amount = 500;
+        let deposit_to_vault_inst_data = DepositToVaultInstructionData::new(
+            /* vault owner */ alice.pubkey().to_bytes(), 
+            /* index */ create_vault_inst_data.index(), 
+            /* amount */ deposit_amount);
+        deposit_to_vault(&mut svm, 
+            /* from_acc */ &alice_ata, 
+            /* from_authority */ &alice, 
+            /* mint */ &mint.pubkey(), 
+            /* inst */ &deposit_to_vault_inst_data);
+
+        // Book transfer
+        let transfer_amount = 250;
+        let book_transfer_inst_data = BookTransferInstructionData::new(
+            /* amount */ transfer_amount, 
+            /* destination */ receiver_ata.to_bytes(),
+            /* vault_index */ create_vault_inst_data.index(), 
+            /* transfer_index */ 1, 
+            /* warmup */ 1, 
+            /* validity*/ 1);
+
+        book_transfer(&mut svm, 
+            /* inst data */ &book_transfer_inst_data, 
+            /* authority */ &alice, 
+            /* mint */ &mint.pubkey(), 
+            /* token_program */ &TOKEN_PROGRAM);
+
+        // Assert vault and deposit
+        let vault_data = find_vault_data_pda(&alice.pubkey(), create_vault_inst_data.index(), &mint.pubkey(), &TOKEN_PROGRAM);
+        let vault = find_vault_pda(&vault_data.0);
+        let transfer = find_transfer_pda(&vault_data.0, book_transfer_inst_data.transfer_index());
+        let deposit = find_deposit_pda(&transfer.0);
+
+    }
     // Helpers 
 
     fn create_svm() -> LiteSVM {
@@ -439,9 +516,9 @@ mod litesvm_tests {
             token_program).0;
         let vault = find_vault_pda(&vault_data).0;
 
-       let to_ata_account = TokenAccount::unpack(&svm.get_account(to).unwrap().data).unwrap();
+        let to_ata_account = TokenAccount::unpack(&svm.get_account(to).unwrap().data).unwrap();
         let to_pre_amount = to_ata_account.amount;
-       let vault_account = TokenAccount::unpack(&svm.get_account(&vault).unwrap().data).unwrap();
+        let vault_account = TokenAccount::unpack(&svm.get_account(&vault).unwrap().data).unwrap();
         let vault_pre_amount = vault_account.amount;
 
 
@@ -469,8 +546,8 @@ mod litesvm_tests {
             panic!("Failed to withdraw: {:#?}", e);
         }
 
-       let to_ata_account = TokenAccount::unpack(&svm.get_account(to).unwrap().data).unwrap();
-       let vault_account = TokenAccount::unpack(&svm.get_account(&vault).unwrap().data).unwrap();
+        let to_ata_account = TokenAccount::unpack(&svm.get_account(to).unwrap().data).unwrap();
+        let vault_account = TokenAccount::unpack(&svm.get_account(&vault).unwrap().data).unwrap();
 
         assert_eq!(to_pre_amount + inst.amount(), to_ata_account.amount);
         assert_eq!(vault_account.amount, vault_pre_amount - inst.amount());
@@ -482,6 +559,19 @@ mod litesvm_tests {
         let vault = find_vault_pda(&vault_data.0);
         let transfer = find_transfer_pda(&vault_data.0, inst_data.transfer_index());
         let deposit = find_deposit_pda(&transfer.0);
+
+        let vault_acc_pre_val = if let Some(a) = &svm.get_account(&vault.0) {
+            TokenAccount::unpack(&a.data).unwrap().amount
+        }
+        else {
+            0
+        };
+        let deposit_acc_pre_val = if let Some(a) = &svm.get_account(&deposit.0) {
+            TokenAccount::unpack(&a.data).unwrap().amount
+        }
+        else {
+            0
+        };
 
         let inst = Instruction::new_with_bytes(
             PIME_ID, 
@@ -506,6 +596,15 @@ mod litesvm_tests {
         if let Err(e) = svm.send_transaction(tx) {
             panic!("Failed to book transfer: {:#?}", e);
         }
+
+        let vault_acc = TokenAccount::unpack(&svm.get_account(&vault.0).unwrap().data).unwrap();
+        let deposit_acc = TokenAccount::unpack(&svm.get_account(&deposit.0).unwrap().data).unwrap();
+
+        // Check that the tokens are transferred out of the vault.
+        assert_eq!(vault_acc.amount, vault_acc_pre_val - inst_data.amount()); 
+
+        // Check that the tokens has been sent to the deposit account.
+        assert_eq!(deposit_acc.amount, inst_data.amount());
     }
 
     fn find_vault_data_pda(authority: &Pubkey, index: u64, mint: &Pubkey, token_program: &Pubkey) -> (Pubkey, u8) {
