@@ -1,6 +1,6 @@
-use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, msg, program_error::ProgramError, pubkey::pubkey_eq, seeds};
+use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, msg, program_error::ProgramError, pubkey::{find_program_address, pubkey_eq}, seeds};
 
-use crate::{errors::PimeError, states::{VaultData, from_bytes, transfer_data::TransferData}};
+use crate::{errors::PimeError, interface::instructions::execute_transfer::ExecuteTransferInstructionData, states::{VaultData, from_bytes, transfer_data::TransferData}};
 
 /// Transfers assets from its booked vault to the received.
 pub fn execute_transfer(accounts: &[AccountInfo], instrution_data: &[u8]) -> ProgramResult {
@@ -9,17 +9,15 @@ pub fn execute_transfer(accounts: &[AccountInfo], instrution_data: &[u8]) -> Pro
     //   - `u64`       The transfer index.
     
     //      Deserialize instruction data
-    let (vault_index, transfer_index) = (1,2);
+    if instrution_data.len() < size_of::<ExecuteTransferInstructionData>() - size_of::<u8>() {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+    let (vault_index, transfer_index) = (
+        u64::from_le_bytes(unsafe {*(instrution_data.as_ptr() as *const [u8; size_of::<u64>()])}),
+        u64::from_le_bytes(unsafe {*(instrution_data.as_ptr().add(size_of::<u64>()) as *const [u8; size_of::<u64>()])})
+    );
 
-
-    //   0. `[signer]`     The owner of the vault.
-    //   1. `[writeable]`  The vault account.
-    //   2. `[writeable]`  The transfer account.
-    //   3. `[writeable]`  The deposit account.
-    //   4. `[writeable]`  The destination account.
-    //   4. `[]`           The mint address of the vault/transfer. 
-    //   5. `[]`           The token program. 
-    let [authority, vault, transfer, deposit, destination, mint, token_program, _remaining @ ..] = accounts else {
+    let [authority, vault, transfer, deposit, destination, mint, token_program, remaining @ ..] = accounts else {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
 
@@ -37,7 +35,7 @@ pub fn execute_transfer(accounts: &[AccountInfo], instrution_data: &[u8]) -> Pro
         msg!("Vault is not initialized");
         return Err(ProgramError::UninitializedAccount);
     }
-    if !vault.is_owned_by(&crate::ID) {
+    if !vault.is_owned_by(token_program.key()) {
         msg!("Vault has illegal owner.");
         return Err(ProgramError::IllegalOwner);
     }
@@ -76,9 +74,31 @@ pub fn execute_transfer(accounts: &[AccountInfo], instrution_data: &[u8]) -> Pro
     }
 
     if destination.lamports() == 0 {
-        // TODO create token account.
-        msg!("Destination account is not created. Ask the owner to create the account. TODO Initialize account.");
-        return Err(ProgramError::UninitializedAccount);
+        let [system_program, ata_owner, a_token, _remainder @ .. ] = remaining else {
+            msg!("Requires system program, ata owner, and associated token program.");
+            return Err(ProgramError::NotEnoughAccountKeys);
+        };
+        if !pubkey_eq(a_token.key(), &pinocchio_associated_token_account::ID) {
+            msg!("Associated token program is incorrect.");
+            return Err(ProgramError::IllegalOwner);
+        }
+        let ata = find_program_address(&[
+            ata_owner.key(),
+            token_program.key(),
+            mint.key(),
+        ], a_token.key());
+        if !pubkey_eq(destination.key(), &ata.0) {
+            msg!("Destination ATA is not derived from the provided owner.");
+            return Err(PimeError::DestinationMismatch.into());
+        }
+        pinocchio_associated_token_account::instructions::Create{
+            funding_account: authority,
+            account: destination,
+            wallet: ata_owner,
+            mint,
+            system_program,
+            token_program
+        }.invoke()?;
     }
     if !destination.is_owned_by(token_program.key()) {
         msg!("Destination account is not owned by the supplied token program");
