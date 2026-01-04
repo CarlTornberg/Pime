@@ -46,9 +46,9 @@ pub fn process_instruction(
             msg!("Book transfer");
             processors::transfer::book_transfer::process_book_transfer(accounts, data)?
         },
-        11 => {
+       11 => {
             msg!("Execute transfer");
-            processors::transfer::book_transfer::process_book_transfer(accounts, data)?
+            processors::transfer::execute_transfer::execute_transfer(accounts, data)?
         },
         _ => {return Err(ProgramError::InvalidInstructionData);}
         
