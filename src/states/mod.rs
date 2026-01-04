@@ -22,10 +22,7 @@ pub fn as_bytes<T: Transmutable>(data: &T) -> &[u8] {
 }
 
 /// Convert a data array to T
-///
-/// # SAFETY
-/// Caller must ensure that the provided data is a valid representation of T 
-pub unsafe fn from_bytes<T: Transmutable>(data: &[u8]) -> Result<&T, ProgramError> {
+pub fn from_bytes<T: Transmutable>(data: &[u8]) -> Result<&T, ProgramError> {
     if data.len() != core::mem::size_of::<T>() {
         return Err(ProgramError::InvalidAccountData);
     }
