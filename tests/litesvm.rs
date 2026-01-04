@@ -7,9 +7,11 @@ mod litesvm_tests {
     use pime::interface::instructions::book_transfer::BookTransferInstructionData;
     use pime::interface::instructions::create_vault_instruction::CreateVaultInstructionData;
     use pime::interface::instructions::deposit_to_vault_instruction::DepositToVaultInstructionData;
+    use pime::interface::instructions::execute_transfer::ExecuteTransferInstructionData;
     use pime::interface::instructions::withdraw_from_vault::WithdrawFromVaultInstructionData;
     use pime::shared;
-    use pime::states::{VaultData, VaultHistory, as_bytes};
+    use pime::states::transfer_data::TransferData;
+    use pime::states::{VaultData, VaultHistory, as_bytes, from_bytes};
     use solana_sdk::message::{AccountMeta, Instruction};
     use solana_sdk::{message::Message, native_token::LAMPORTS_PER_SOL, program_pack::Pack, pubkey::Pubkey, signature::Keypair, signer::Signer, transaction::Transaction};
     use spl_associated_token_account_interface::address::{get_associated_token_address, get_associated_token_address_with_program_id};
@@ -265,8 +267,8 @@ mod litesvm_tests {
         let mint = Keypair::new();
         let alice_ata = get_associated_token_address(&alice.pubkey(), &mint.pubkey());
 
-        let receiver = Keypair::new();
-        let receiver_ata = get_associated_token_address(&receiver.pubkey(), &mint.pubkey());
+        let destination = Keypair::new();
+        let destination_ata = get_associated_token_address(&destination.pubkey(), &mint.pubkey());
 
         let mint_amount = 1_000;
 
@@ -314,11 +316,11 @@ mod litesvm_tests {
         let transfer_amount = 250;
         let book_transfer_inst_data = BookTransferInstructionData::new(
             /* amount */ transfer_amount, 
-            /* destination */ receiver_ata.to_bytes(),
+            /* destination */ destination_ata.to_bytes(),
             /* vault_index */ create_vault_inst_data.index(), 
             /* transfer_index */ 1, 
             /* warmup */ 1, 
-            /* validity*/ 1);
+            /* validity*/ 100);
 
         book_transfer(&mut svm, 
             /* inst data */ &book_transfer_inst_data, 
@@ -326,12 +328,17 @@ mod litesvm_tests {
             /* mint */ &mint.pubkey(), 
             /* token_program */ &TOKEN_PROGRAM);
 
-        // Assert vault and deposit
-        let vault_data = find_vault_data_pda(&alice.pubkey(), create_vault_inst_data.index(), &mint.pubkey(), &TOKEN_PROGRAM);
-        let vault = find_vault_pda(&vault_data.0);
-        let transfer = find_transfer_pda(&vault_data.0, book_transfer_inst_data.transfer_index());
-        let deposit = find_deposit_pda(&transfer.0);
+        let execute_transfer_inst_data = ExecuteTransferInstructionData::new(
+            book_transfer_inst_data.vault_index(), 
+            book_transfer_inst_data.transfer_index());
 
+        execute_transfer(&mut svm, 
+            /* inst_data */ &execute_transfer_inst_data, 
+            /* authority */ &alice, 
+            /* destination */ &destination_ata, 
+            /* destination owner */ &destination.pubkey(),
+            /* mint */ &mint.pubkey(), 
+            /* token_program */ &TOKEN_PROGRAM);
     }
     // Helpers 
 
@@ -605,6 +612,71 @@ mod litesvm_tests {
 
         // Check that the tokens has been sent to the deposit account.
         assert_eq!(deposit_acc.amount, deposit_acc_pre_val + inst_data.amount());
+    }
+
+    fn execute_transfer(svm: &mut LiteSVM, inst_data: &ExecuteTransferInstructionData, authority: &Keypair, destination: &Pubkey, destination_owner: &Pubkey, mint: &Pubkey, token_program: &Pubkey) {
+        let inst_bytes = as_bytes(inst_data);
+        let vault_data = find_vault_data_pda(&authority.pubkey(), inst_data.vault_index(), mint, token_program);
+        let vault = find_vault_pda(&vault_data.0);
+        let transfer = find_transfer_pda(&vault_data.0, inst_data.transfer_index());
+        let deposit = find_deposit_pda(&transfer.0);
+
+        let deposit_acc_pre_val = if let Some(a) = &svm.get_account(&deposit.0) {
+            TokenAccount::unpack(&a.data).unwrap().amount
+        }
+        else {
+            0
+        };
+        let destination_acc_pre_val = if let Some(a) = &svm.get_account(destination) {
+            TokenAccount::unpack(&a.data).unwrap().amount
+        }
+        else {
+            0
+        };
+        let tda = svm.get_account(&transfer.0).unwrap();
+        let transfer_acc = from_bytes::<TransferData>(&tda.data).unwrap();
+        let transfer_amount = transfer_acc.amount();
+
+        let inst = Instruction::new_with_bytes(
+            PIME_ID, 
+            inst_bytes, 
+            [
+                AccountMeta::new(authority.pubkey(), true),
+                AccountMeta::new(vault.0, false),
+                AccountMeta::new(transfer.0, false),
+                AccountMeta::new(deposit.0, false),
+                AccountMeta::new(*destination, false),
+                AccountMeta::new_readonly(*mint, false),
+                AccountMeta::new_readonly(*token_program, false),
+                AccountMeta::new_readonly(solana_system_interface::program::ID, false),
+                AccountMeta::new_readonly(*destination_owner, false),
+                AccountMeta::new_readonly(spl_associated_token_account_interface::program::ID, false),
+            ].to_vec()
+        );
+
+        let tx = Transaction::new(
+            /* from keypairs */ &[authority], 
+            /* message */ Message::new(&[inst], Some(&authority.pubkey())), 
+            /* recent_blockhash */ svm.latest_blockhash());
+
+        if let Err(e) = svm.send_transaction(tx) {
+            panic!("Failed to execute transfer: {:#?}", e);
+        }
+
+        // Check that the deposit account has transferred the tokens out.
+        if let Some(a) = svm.get_account(&deposit.0) { // If account is not closed for some reason.
+            assert_eq!(TokenAccount::unpack(&a.data).unwrap().amount, deposit_acc_pre_val - transfer_amount);
+        }
+
+        // Check that the destination has received its tokens
+        if let Some(a) = svm.get_account(destination) {
+            assert_eq!(TokenAccount::unpack(&a.data).unwrap().amount, destination_acc_pre_val + transfer_amount);
+        }
+
+        // Check that the transfer account is closed.
+        if let Some(a) = svm.get_account(&transfer.0) {
+            assert_eq!(a.lamports, 0);
+        }
     }
 
     fn find_vault_data_pda(authority: &Pubkey, index: u64, mint: &Pubkey, token_program: &Pubkey) -> (Pubkey, u8) {
