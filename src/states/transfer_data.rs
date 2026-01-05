@@ -37,6 +37,22 @@ impl TransferData {
         u64::from_le_bytes(self.amount)
     }
 
+    pub fn created(&self) -> UnixTimestamp {
+        UnixTimestamp::from_le_bytes(self.created)
+    }
+
+    pub fn created_epoch(&self) -> UnixTimestamp {
+        UnixTimestamp::from_le_bytes(self.created_epoch)
+    }
+
+    pub fn warmup(&self) -> UnixTimestamp {
+        UnixTimestamp::from_le_bytes(self.warmup)
+    }
+
+    pub fn validity(&self) -> UnixTimestamp {
+        UnixTimestamp::from_le_bytes(self.validity)
+    }
+
     // Get the transfer's PDA.
     // Derived from the vault_data
     pub fn get_transfer_pda(vault_data: &Pubkey, transfer_index: &u64) -> (Pubkey, u8) {
