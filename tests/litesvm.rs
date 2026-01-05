@@ -319,7 +319,7 @@ mod litesvm_tests {
             /* destination */ destination_ata.to_bytes(),
             /* vault_index */ create_vault_inst_data.index(), 
             /* transfer_index */ 1, 
-            /* warmup */ 1, 
+            /* warmup */ 0, 
             /* validity*/ 100);
 
         book_transfer(&mut svm, 
