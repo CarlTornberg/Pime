@@ -13,6 +13,9 @@ pub enum PimeError {
     UnsupporedTokenProgram,
     VaultWarmupViolation,
     DestinationMismatch,
+    TransferWarmingUp,
+    TransferExpired,
+
 
 
 
