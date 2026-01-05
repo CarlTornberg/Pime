@@ -90,12 +90,16 @@ pub enum PimeInstruction {
     ///
     /// Accounts expected by this instruction:
     ///
-    ///   0. `[signer]`     The owner of the vault.
+    ///   0. `[signer]`     The authority of the vault.
     ///   1. `[writeable]`  The vault account.
     ///   2. `[writeable]`  The transfer account.
     ///   3. `[writeable]`  The deposit account.
+    ///   4. `[writeable]`  The destination account. (ATA)
     ///   4. `[]`           The mint address of the vault/transfer. 
     ///   5. `[]`           The token program. 
+    ///   6. `[]`           (Optional) The system program. (If destination ATA needs to be created)
+    ///   6. `[]`           (Optional) The destination ATA's owner/authority account. (If destination ATA needs to be created)
+    ///   7. `[]`           (Optional) The ATA program. (If destination ATA needs to be created)
     ///
     /// Data expected by this instruction:
     ///
