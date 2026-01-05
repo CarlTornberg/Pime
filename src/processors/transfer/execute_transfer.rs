@@ -5,9 +5,6 @@ use crate::{errors::PimeError, interface::instructions::execute_transfer::Execut
 /// Transfers assets from its booked vault to the received.
 pub fn execute_transfer(accounts: &[AccountInfo], instrution_data: &[u8]) -> ProgramResult {
     
-    //   - `u64`       The vault index.
-    //   - `u64`       The transfer index.
-    
     //      Deserialize instruction data
     if instrution_data.len() < size_of::<ExecuteTransferInstructionData>() - size_of::<u8>() {
         return Err(ProgramError::InvalidInstructionData);
