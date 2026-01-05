@@ -1,4 +1,4 @@
-use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, msg, program_error::ProgramError, pubkey::{find_program_address, pubkey_eq}, seeds};
+use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, msg, program_error::ProgramError, pubkey::{find_program_address, pubkey_eq}, seeds, sysvars::{Sysvar, clock::Clock}};
 
 use crate::{errors::PimeError, interface::instructions::execute_transfer::ExecuteTransferInstructionData, states::{VaultData, from_bytes, transfer_data::TransferData}};
 
@@ -116,6 +116,15 @@ pub fn execute_transfer(accounts: &[AccountInfo], instrution_data: &[u8]) -> Pro
     if !pubkey_eq(&transfer_data.destination, destination.key()) {
         msg!("Supplied destination account does not match expected account");
         return Err(PimeError::DestinationMismatch.into());
+    }
+    let now = Clock::get()?.unix_timestamp;
+    if now < transfer_data.created() + transfer_data.warmup() {
+        msg!("Warm-up period has not yet passed.");
+        return Err(PimeError::TransferWarmingUp.into());
+    }
+    if now > transfer_data.created() + transfer_data.validity() {
+        msg!("Transfer has expired. Close this transfer and create a new one.");
+        return Err(PimeError::TransferExpired.into());
     }
     //      Transfer from deposit to target account
     let deposit_bump = &[deposit_pda.1];
