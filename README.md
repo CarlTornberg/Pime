@@ -91,14 +91,18 @@ When a transaction is booked, the user's assets from the specified vault are mov
 * Complete user stories. (Done)
 
 ### Deadline 15 Dec -25
-* Completed architecture diagram.
+* Completed architecture diagram. (Done)
 
 ### Deadline 1.1.26
-* Ability to create vault.
-* Ability to remove vault.
-* Ability to change vault settings.
-* Ability to deposit to vault.
-* Ability to withdraw from vault, with restrictions.
+* Ability to create vault. (Done)
+* Ability to remove vault. (Done)
+* Ability to deposit to vault. (Done)
+* Ability to withdraw from vault, with restrictions. (Done)
+
+### Additional features
+* Book a transfer with a warm-up and validity period. (Done)
+* Execute a transfer within its validity period. (Done)
+* Unbook a transfer, refunding the assets back into the vault (WIP)
 
 ## Look into:
 * Magic block - Cheap transactions.
