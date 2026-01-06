@@ -113,7 +113,7 @@ pub fn process_create_vault(accounts: &[AccountInfo], instruction_data: &[u8]) -
     else if !vault.is_owned_by(&pinocchio_token::ID) { // Force vault to be owned by token program
         msg!("Be aware, the vault is not owned by the token program.");
         // (TODO fix so that is supports other programs, but with safety (pre init attacks etc)
-        return Err(PimeError::InvalidTokenProgram.into());
+        return Err(PimeError::UnsupportedTokenProgram.into());
     }
 
     ProgramResult::Ok(())

@@ -27,7 +27,7 @@ pub fn transfer(
     //    Token Program
 
     if !pubkey_eq(token_program.key(), &pinocchio_token::ID) {
-        return Err(PimeError::InvalidTokenProgram.into());
+        return Err(PimeError::UnsupportedTokenProgram.into());
     }
 
     //    Mint 

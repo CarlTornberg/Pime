@@ -3,7 +3,7 @@ use pinocchio::program_error::ProgramError;
 #[repr(u8)]
 pub enum PimeError {
     IncorrectPDA = 0,
-    InvalidTokenProgram = 1,
+    UnsupportedTokenProgram = 1,
     InvalidMintTokenProgram = 2,
     Unserializeable = 3,
     Undeserializeable = 4,
