@@ -50,6 +50,10 @@ pub fn process_instruction(
             msg!("Execute transfer");
             processors::transfer::execute_transfer::execute_transfer(accounts, data)?
         },
+       12 => {
+            msg!("Unbook transfer");
+            processors::transfer::unbook_transfer::unbook_transfer(accounts, data)?
+        },
         _ => {return Err(ProgramError::InvalidInstructionData);}
         
     }
