@@ -67,7 +67,7 @@ pub enum PimeInstruction {
     /// Accounts expected by this instruction:
     ///
     ///   0. `[signer]`     The owner of the vault.
-    ///   1. `[]`  The vault data account.
+    ///   1. `[]`           The vault data account.
     ///   1. `[writeable]`  The vault account.
     ///   2. `[writeable]`  The transfer account.
     ///   3. `[writeable]`  The deposit account.
@@ -107,6 +107,24 @@ pub enum PimeInstruction {
     ///   - `u64`       The transfer index.
     ExecuteTransfer = 11,
 
+    /// Unbook a transfer.
+    ///
+    ///
+    /// Accounts expected by this instruction:
+    ///
+    ///   0. `[signer]`     The authority of the vault.
+    ///   1. `[]`           The vault data account.
+    ///   2. `[writeable]`  The vault account.
+    ///   3. `[writeable]`  The transfer account.
+    ///   4. `[writeable]`  The deposit account.
+    ///   5. `[]`           The mint address of the vault/transfer. 
+    ///   6. `[]`           The token program. 
+    ///
+    /// Data expected by this instruction:
+    ///
+    ///   - `u64`       The vault index.
+    ///   - `u64`       The transfer index.
+    ///
     UnbookTransfer = 12,
 }
 
