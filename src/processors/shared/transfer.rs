@@ -1,6 +1,6 @@
 use pinocchio::{account_info::AccountInfo, instruction::Signer, msg, program_error::ProgramError, pubkey::pubkey_eq, seeds, sysvars::{Sysvar, clock::Clock}};
 
-use crate::{errors::PimeError, shared::deserialize, states::{VaultData, VaultHistory}};
+use crate::{errors::PimeError, states::{VaultData, VaultHistory, from_bytes}};
 
 pub fn transfer(
     authority: &AccountInfo, 
@@ -92,7 +92,7 @@ pub fn transfer(
             vault_data.data_ptr(), 
             size_of::<VaultData>())
     };
-    let vault_data_desed = deserialize::<VaultData>(vault_data_bytes)?;
+    let vault_data_desed = from_bytes::<VaultData>(vault_data_bytes)?;
     // if pubkey_eq(&vault_data_desed.authority, authority.key()) { // Probably redundant as the authority needs to be signer, and vault is derived from the authority.
     //     return Err(PimeError::AuthorityError.into());
     // }

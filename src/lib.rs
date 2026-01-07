@@ -7,7 +7,6 @@ use pinocchio_pubkey::declare_id;
 
 pub mod interface;
 mod processors;
-pub mod shared;
 pub mod states;
 pub mod errors;
 

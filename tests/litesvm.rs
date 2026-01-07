@@ -8,8 +8,8 @@ mod litesvm_tests {
     use pime::interface::instructions::create_vault_instruction::CreateVaultInstructionData;
     use pime::interface::instructions::deposit_to_vault_instruction::DepositToVaultInstructionData;
     use pime::interface::instructions::execute_transfer::ExecuteTransferInstructionData;
+    use pime::interface::instructions::unbook_transfer_instruction::UnbookTransferInstructionData;
     use pime::interface::instructions::withdraw_from_vault::WithdrawFromVaultInstructionData;
-    use pime::shared;
     use pime::states::transfer_data::TransferData;
     use pime::states::{VaultData, VaultHistory, as_bytes, from_bytes};
     use solana_sdk::message::{AccountMeta, Instruction};
@@ -340,6 +340,86 @@ mod litesvm_tests {
             /* mint */ &mint.pubkey(), 
             /* token_program */ &TOKEN_PROGRAM);
     }
+
+    #[test]
+    fn alice_unbooks_transfer() {
+        let mut svm = create_svm();
+        let alice = Keypair::new();
+        svm.airdrop(&alice.pubkey(), LAMPORTS_PER_SOL).unwrap();
+        let mint = Keypair::new();
+        let alice_ata = get_associated_token_address(&alice.pubkey(), &mint.pubkey());
+
+        let destination = Keypair::new();
+        let destination_ata = get_associated_token_address(&destination.pubkey(), &mint.pubkey());
+
+        let mint_amount = 1_000;
+
+        // Mint tokens
+        initialize_mint(
+            /* svm */ &mut svm, 
+            /* authority */ &alice.pubkey(), 
+            /* mint */ &mint, 
+            /* payer */ &alice);
+        mint_to(&mut svm, 
+            /* mint */ &mint.pubkey(), 
+            /* mint_authority */ &alice, 
+            /* to */ &alice.pubkey(), 
+            /* to_ata */ &alice_ata, 
+            /* payer */ &alice, 
+            /* amount */ mint_amount);
+
+        // Create vault
+        let create_vault_inst_data = CreateVaultInstructionData::new(
+            /* index */ 1, 
+            /* timeframe */ 2, 
+            /* max_transactions */ 3, 
+            /* max_amount */ 4, 
+            /* transfer_min_warmup */ 5, 
+            /* transfer_max_window */ 6);
+        create_new_vault(&mut svm, 
+            /* authority */ &alice, 
+            /* instuction_data */ &create_vault_inst_data,  
+            /* mint */ &mint.pubkey()
+        );
+
+        // Deposit to vault
+        let deposit_amount = 500;
+        let deposit_to_vault_inst_data = DepositToVaultInstructionData::new(
+            /* vault owner */ alice.pubkey().to_bytes(), 
+            /* index */ create_vault_inst_data.index(), 
+            /* amount */ deposit_amount);
+        deposit_to_vault(&mut svm, 
+            /* from_acc */ &alice_ata, 
+            /* from_authority */ &alice, 
+            /* mint */ &mint.pubkey(), 
+            /* inst */ &deposit_to_vault_inst_data);
+
+        // Book transfer
+        let transfer_amount = 250;
+        let book_transfer_inst_data = BookTransferInstructionData::new(
+            /* amount */ transfer_amount, 
+            /* destination */ destination_ata.to_bytes(),
+            /* vault_index */ create_vault_inst_data.index(), 
+            /* transfer_index */ 1, 
+            /* warmup */ 0, 
+            /* validity*/ 100);
+
+        book_transfer(&mut svm, 
+            /* inst data */ &book_transfer_inst_data, 
+            /* authority */ &alice, 
+            /* mint */ &mint.pubkey(), 
+            /* token_program */ &TOKEN_PROGRAM);
+
+        let unbook_transfer_inst_data = UnbookTransferInstructionData::new(
+            book_transfer_inst_data.vault_index(), 
+            book_transfer_inst_data.transfer_index(),
+        );
+        unbook_transfer(&mut svm, 
+            /* inst data */ &unbook_transfer_inst_data, 
+            /* authority */ &alice, 
+            &mint.pubkey(), 
+            &TOKEN_PROGRAM);
+    }
     // Helpers 
 
     fn create_svm() -> LiteSVM {
@@ -433,12 +513,11 @@ mod litesvm_tests {
 
         let max_transactions = instuction_data.max_transactions();
 
-        let mut data = [0; size_of::<CreateVaultInstructionData>()];
-        shared::serialize(instuction_data, &mut data).unwrap();
+        let data = as_bytes(instuction_data);
 
         let create_vault_inst = Instruction::new_with_bytes(
             /* program id*/     PIME_ID, 
-            /* data */          data.as_slice(), 
+            /* data */          data, 
             /* accounts */ [
                 AccountMeta::new(authority.pubkey(), true),
                 AccountMeta::new(vault_data.0, false),
@@ -462,8 +541,9 @@ mod litesvm_tests {
         let vault_data_bytes = svm.get_account(&vault_data.0).unwrap().data;
         assert_eq!(vault_data_bytes.len(), size_of::<VaultData>() + size_of::<VaultHistory>() * max_transactions as usize);
         // # SAFETY Data bytes are of type Vault
-        let vault_acc = unsafe { pime::states::from_bytes::<VaultData>(&vault_data_bytes[0.. size_of::<VaultData>()]) };
+        let vault_acc = from_bytes::<VaultData>(&vault_data_bytes[0.. size_of::<VaultData>()]);
         assert_eq!(vault_acc.unwrap().timeframe(), instuction_data.timeframe());
+        let vault_acc = pime::states::from_bytes::<VaultData>(&vault_data_bytes);
         assert_eq!(vault_acc.unwrap().max_transactions(), instuction_data.max_transactions());
         assert_eq!(vault_acc.unwrap().max_amount(), instuction_data.max_amount());
         for d in &vault_data_bytes[size_of::<VaultData>() ..] {
@@ -472,8 +552,7 @@ mod litesvm_tests {
     }
     
     fn deposit_to_vault(svm: &mut LiteSVM, from_acc: &Pubkey, from_authority: &Keypair, mint: &Pubkey, inst: &DepositToVaultInstructionData) {
-        let mut buf = [0; size_of::<DepositToVaultInstructionData>()];
-        shared::serialize(inst, &mut buf).unwrap();
+        let buf = as_bytes(inst);
         println!("deposit instruction inst index: {}, amount: {}", inst.index(), inst.amount());
         println!("deposit instruction bytes {:?}", buf);
 
@@ -483,7 +562,7 @@ mod litesvm_tests {
 
         let deposit_inst = Instruction::new_with_bytes(
             PIME_ID,
-            buf.as_slice(), 
+            buf, 
             [
                 AccountMeta::new(from_authority.pubkey(), true),
                 AccountMeta::new(*from_acc, false),
@@ -676,6 +755,46 @@ mod litesvm_tests {
         // Check that the transfer account is closed.
         if let Some(a) = svm.get_account(&transfer.0) {
             assert_eq!(a.lamports, 0);
+        }
+    }
+
+    fn unbook_transfer(svm: &mut LiteSVM, inst_data: &UnbookTransferInstructionData, authority: &Keypair, mint: &Pubkey, token_program: &Pubkey) {
+        let vault_data = find_vault_data_pda(&authority.pubkey(), inst_data.vault_index(), mint, token_program);
+        let vault = find_vault_pda(&vault_data.0);
+        let transfer = find_transfer_pda(&vault_data.0, inst_data.transfer_index());
+        let deposit = find_deposit_pda(&transfer.0);
+
+        let inst_bytes = as_bytes(inst_data);
+
+        let inst = Instruction::new_with_bytes(
+            PIME_ID, 
+            inst_bytes, 
+            [
+                AccountMeta::new(authority.pubkey(), true),
+                AccountMeta::new_readonly(vault_data.0, false),
+                AccountMeta::new(vault.0, false),
+                AccountMeta::new(transfer.0, false),
+                AccountMeta::new(deposit.0, false),
+                AccountMeta::new_readonly(*mint, false),
+                AccountMeta::new(*token_program, false),
+            ].to_vec());
+
+        let tx = Transaction::new(
+            &[authority], 
+            Message::new(&[inst], Some(&authority.pubkey())), 
+            svm.latest_blockhash()
+        );
+
+        if let Err(e) = svm.send_transaction(tx) {
+            panic!("Failed to  unbook transfer: {:#?}", e);
+        }
+
+        if svm.get_account(&transfer.0).is_some() {
+            panic!("Failed to close transfer account");
+        }
+
+        if svm.get_account(&deposit.0).is_some() {
+            panic!("Failed to close deposit account");
         }
     }
 
