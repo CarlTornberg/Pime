@@ -85,6 +85,12 @@ When a transaction is booked, the user's assets from the specified vault are mov
 ##### Vault
 * As an on-chain user, when I transfer assets to an existing vault, the assets will be transferred to the vault.
 
+## PDA's
+* Vault Data    - b"vault_data", vault_index, authority, mint, token_program
+* Vault         - b"vault", vault_index, authority, mint, token_program
+* Transfer      - b"transfer", vault_index, transfer_index, authority, mint, token_program
+* Deposit       - b"deposit", vault_index, transfer_index, authority, mint, token_program
+
 
 ## Timeline
 ### Deadline 8 Dec -25
