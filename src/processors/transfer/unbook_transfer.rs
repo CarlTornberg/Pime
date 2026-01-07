@@ -48,7 +48,7 @@ pub fn unbook_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) -> Pro
     }
 
     let vault_pda = VaultData::get_vault_pda(vault_data.key());
-    if pubkey_eq(&vault_pda.0, vault.key()) {
+    if !pubkey_eq(&vault_pda.0, vault.key()) {
         msg!("Vault PDA incorrect.");
         return Err(PimeError::IncorrectPDA.into());
     }
@@ -114,7 +114,7 @@ pub fn unbook_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) -> Pro
     pinocchio_token::instructions::Transfer {
         from: deposit,
         to: vault,
-        authority: vault,
+        authority: deposit,
         amount: vault_acc.amount()
     }.invoke_signed(&[Signer::from(&deposit_seeds)])?;
     
