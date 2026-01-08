@@ -1,4 +1,4 @@
-use pinocchio::{pubkey::{Pubkey, find_program_address}, sysvars::clock::UnixTimestamp};
+use pinocchio::{instruction::Seed, pubkey::{Pubkey, find_program_address}, seeds, sysvars::clock::UnixTimestamp};
 use crate::states::Transmutable;
 
 #[repr(C)]
@@ -99,29 +99,46 @@ impl VaultData {
     /// Index allows an author to have multiple vaults for a specific token
     /// This enabled additional fine grained control over an asset.
     pub fn get_vault_data_pda(authority: &Pubkey, index: u64, mint: &Pubkey, token_program: &Pubkey) -> (Pubkey, u8) {
-        let program_id = &crate::ID;
         let seeds: &[&[u8]] = &[
             VaultData::VAULT_DATA_SEED,
-            authority,
             &index.to_le_bytes(),
+            authority,
             mint,
             token_program,
         ];
-        find_program_address(seeds, program_id)
+        find_program_address(seeds, &crate::ID)
+    }
+    pub fn get_vault_data_signer_seeds<'a>(authority: &'a Pubkey, vault_index: &'a [u8; size_of::<u64>()], mint: &'a Pubkey, token_program: &'a Pubkey, bump: &'a [u8]) -> [Seed<'a>; 6] {
+        seeds!(
+            VaultData::VAULT_DATA_SEED,
+            vault_index,
+            authority,
+            mint,
+            token_program,
+            bump
+        )
     }
     
-    /// Get the Vault PDA, which is a ATA owner by the vault_data
-    /// TODO Should this be a ATA or not?
-    /// Pro: Predictable and follow the regular way of deriving it
-    /// Con: Needs to be derived by the ATA ID, and calling the ADA does nothing
-    /// else than checks that the ATA derivation is correct, then calls
-    /// the token program to create the account, which is then owned by the token program.
-    pub fn get_vault_pda(vault_data: &Pubkey) -> (Pubkey, u8) {
-        // Is an ATA derived address.
-        find_program_address(&[
-            vault_data,
-        ], 
-            &crate::ID)
+    /// Get the Vault PDA
+    pub fn get_vault_pda(authority: &Pubkey, index: u64, mint: &Pubkey, token_program: &Pubkey) -> (Pubkey, u8) {
+        let seeds: &[&[u8]] = &[
+            VaultData::VAULT_SEED,
+            &index.to_le_bytes(),
+            authority,
+            mint,
+            token_program,
+        ];
+        find_program_address(seeds, &crate::ID)
+    }
+    pub fn get_vault_signer_seeds<'a>(authority: &'a Pubkey, vault_index: &'a [u8; size_of::<u64>()], mint: &'a Pubkey, token_program: &'a Pubkey, bump: &'a [u8]) -> [Seed<'a>; 6] {
+        seeds!(
+            VaultData::VAULT_SEED,
+            vault_index,
+            authority,
+            mint,
+            token_program,
+            bump
+        )
     }
     
 }

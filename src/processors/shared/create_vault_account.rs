@@ -1,4 +1,4 @@
-use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, pubkey::Pubkey, seeds};
+use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, pubkey::Pubkey};
 use pinocchio_token::state::TokenAccount;
 
 /// Create the Vault Token Account.
@@ -6,14 +6,12 @@ use pinocchio_token::state::TokenAccount;
 /// Will fail if account exists (Does not check)
 pub fn create_vault_account (
     payer: &AccountInfo, 
-    vault: &AccountInfo, 
-    vault_bump: u8,
-    vault_data_pubkey: &Pubkey, 
+    vault: &AccountInfo,
     mint: &AccountInfo, 
     token_program: &Pubkey, 
+    vault_signer: &Signer,
 ) -> ProgramResult {
-    let vault_bump = &[vault_bump];
-    let vault_signer_seeds = seeds!( vault_data_pubkey, vault_bump );
+    let signer = core::slice::from_ref(vault_signer);
 
     pinocchio_system::create_account_with_minimum_balance_signed(
             /* account */ vault, 
@@ -21,14 +19,14 @@ pub fn create_vault_account (
             /* owner */ token_program, 
             /* payer */ payer, 
             /* rent sysvar */ None,
-            /* signers */ &[Signer::from(&vault_signer_seeds)],
+            /* signers */ signer,
         )?;
 
     pinocchio_token::instructions::InitializeAccount3 {
         account: vault,
         mint,
         owner: vault.key(),
-    }.invoke_signed(&[Signer::from(&vault_signer_seeds)])?;
+    }.invoke_signed(signer)?;
 
     Ok(())
 }

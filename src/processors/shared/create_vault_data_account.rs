@@ -10,7 +10,8 @@ pub(crate) fn process_create_vault_data_account(
     max_lamports: u64, 
     transfer_min_warmup: UnixTimestamp,
     transfer_max_window: UnixTimestamp,
-    vault_data_signer: Signer) -> Result<(), ProgramError> {
+    vault_data_signer: &Signer) -> Result<(), ProgramError> {
+    let signer = core::slice::from_ref(vault_data_signer);
 
     let vault_data_size = size_of::<VaultData>() + (max_transactions as usize * size_of::<VaultHistory>());
     pinocchio_system::
@@ -20,7 +21,7 @@ pub(crate) fn process_create_vault_data_account(
             /* owner */ &crate::ID, 
             /* payer */ authority, 
             /* rent sysvar */ None,
-            /* signer seeds */ &[vault_data_signer]
+            /* signer seeds */ signer
         )?;
 
     // SAFETY: Data is not previously borrowed and is represented by a valid format.

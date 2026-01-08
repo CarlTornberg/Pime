@@ -11,7 +11,7 @@ use crate::{interface::pime_instruction::PimeInstruction, states::Transmutable};
 pub struct BookTransferInstructionData {
     pub discriminator: u8,
     amount: [u8; size_of::<u64>()],
-    destination: Pubkey,
+    pub destination: Pubkey,
     vault_index: [u8; size_of::<u64>()],
     transfer_index: [u8; size_of::<u64>()],
     warmup: [u8; size_of::<UnixTimestamp>()],

@@ -1,31 +1,30 @@
-use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::{Seed, Signer}, pubkey::Pubkey, seeds};
+use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, pubkey::Pubkey};
 use pinocchio_token::state::TokenAccount;
 
 
 pub fn create_deposit_account (
     payer: &AccountInfo,
     deposit: &AccountInfo, 
-    transfer: &AccountInfo, 
-    deposit_bump: &[u8],
     mint: &AccountInfo,
     token_program: &Pubkey,
+    deposit_signer: &Signer,
 ) -> ProgramResult {
-    let seed = seeds!(transfer.key(), deposit_bump);
 
+    let signer = core::slice::from_ref(deposit_signer);
     pinocchio_system::create_account_with_minimum_balance_signed(
             /* account */ deposit, 
             /* space */ TokenAccount::LEN,
             /* owner */ token_program, 
             /* payer */ payer, 
             /* rent sysvar */ None,
-            /* signers */ &[Signer::from(&seed)],
+            /* signers */ signer,
         )?;
 
     pinocchio_token::instructions::InitializeAccount3 {
         account: deposit,
         mint,
         owner: deposit.key(),
-    }.invoke_signed(&[Signer::from(&seed)])?;
+    }.invoke_signed(signer)?;
 
     Ok(())
 }

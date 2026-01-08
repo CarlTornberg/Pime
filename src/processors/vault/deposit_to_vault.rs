@@ -1,11 +1,11 @@
-use pinocchio::{ProgramResult, account_info::AccountInfo, msg, program_error::ProgramError, pubkey::{Pubkey, pubkey_eq}};
+use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, msg, program_error::ProgramError, pubkey::{Pubkey, pubkey_eq}};
 
 use crate::{errors::PimeError, interface::instructions::deposit_to_vault_instruction::DepositToVaultInstructionData, processors, states::VaultData};
 
 pub fn process_deposit_to_vault(accounts: &[AccountInfo], instruction_data: &[u8]) -> ProgramResult {
 
     // Extract instruction data
-    let (vault_owner, index, amount) = 
+    let (vault_owner, vault_index, amount) = 
     // instruction size - discriminator
     if instruction_data.len() >= size_of::<DepositToVaultInstructionData>() - size_of::<u8>() { 
         (
@@ -46,8 +46,7 @@ pub fn process_deposit_to_vault(accounts: &[AccountInfo], instruction_data: &[u8
 
     //      vault data account checks
 
-    let vault_data_pda = VaultData::get_vault_data_pda(vault_owner, index, mint.key(), token_program.key());
-    let vault_pda = VaultData::get_vault_pda(&vault_data_pda.0);
+    let vault_pda = VaultData::get_vault_pda(vault_owner, vault_index, mint.key(), token_program.key());
     if !pubkey_eq(&vault_pda.0, vault.key()) {
         msg!("Invalid vault");
         return Err(PimeError::IncorrectPDA.into());
@@ -60,13 +59,20 @@ pub fn process_deposit_to_vault(accounts: &[AccountInfo], instruction_data: &[u8
     }
 
     if vault.lamports() == 0 {
+        let vault_index_bytes = vault_index.to_le_bytes();
+        let vault_bump = &[vault_pda.1];
+        let vault_signer_seeds = VaultData::get_vault_signer_seeds(
+            vault_owner, 
+            &vault_index_bytes, 
+            mint.key(), 
+            token_program.key(), 
+            vault_bump);
         processors::shared::create_vault_account::create_vault_account(
             /* payer */ from_authority,
             /* vault */ vault,
-            /* vault bump */ vault_pda.1,
-            /* vault data pubkey */ &vault_data_pda.0,
             /* mint */ mint,
             /* token program */ token_program.key(),
+            /* vault signer */ &Signer::from(&vault_signer_seeds)
         )?;
     } 
     else if !vault.is_owned_by(&pinocchio_token::ID) {

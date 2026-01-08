@@ -1,4 +1,4 @@
-use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, msg, program_error::ProgramError, pubkey::{find_program_address, pubkey_eq}, seeds, sysvars::{Sysvar, clock::Clock}};
+use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, msg, program_error::ProgramError, pubkey::{Pubkey, find_program_address, pubkey_eq}, sysvars::{Sysvar, clock::Clock}};
 
 use crate::{errors::PimeError, interface::instructions::execute_transfer::ExecuteTransferInstructionData, states::{VaultData, from_bytes, transfer_data::TransferData}};
 
@@ -22,8 +22,7 @@ pub fn execute_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) -> Pr
         return Err(ProgramError::MissingRequiredSignature);
     }
 
-    let vault_data_pda = VaultData::get_vault_data_pda(authority.key(), vault_index, mint.key(), token_program.key());
-    let vault_pda = VaultData::get_vault_pda(&vault_data_pda.0);
+    let vault_pda = VaultData::get_vault_pda(authority.key(), vault_index, mint.key(), token_program.key());
     if !pubkey_eq(vault.key(), &vault_pda.0) {
         msg!("Invalid Vauld PDA");
         return Err(PimeError::IncorrectPDA.into());
@@ -37,7 +36,7 @@ pub fn execute_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) -> Pr
         return Err(ProgramError::IllegalOwner);
     }
 
-    let transfer_pda = TransferData::get_transfer_pda(&vault_data_pda.0, &transfer_index);
+    let transfer_pda = TransferData::get_transfer_pda(authority.key(), destination.key(), vault_index, transfer_index, mint.key(), token_program.key());
     if !pubkey_eq(transfer.key(), &transfer_pda.0) {
         msg!("Incorrect Transfer PDA");
         return Err(PimeError::IncorrectPDA.into());
@@ -56,7 +55,7 @@ pub fn execute_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) -> Pr
         return Err(ProgramError::AccountDataTooSmall);
     }
 
-    let deposit_pda = TransferData::get_deposit_pda(&transfer_pda.0);
+    let deposit_pda = TransferData::get_deposit_pda(authority.key(), destination.key(), vault_index, transfer_index, mint.key(), token_program.key());
     if !pubkey_eq(deposit.key(), &deposit_pda.0) {
         msg!("Incorrect Deposit PDA");
         return Err(PimeError::IncorrectPDA.into());
@@ -124,8 +123,18 @@ pub fn execute_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) -> Pr
         return Err(PimeError::TransferExpired.into());
     }
     //      Transfer from deposit to target account
+    let vault_index_bytes = vault_index.to_le_bytes();
+    let transfer_index_bytes = transfer_index.to_le_bytes();
     let deposit_bump = &[deposit_pda.1];
-    let deposit_signer_seeds = seeds!(transfer.key(), deposit_bump);
+    let deposit_signer_seeds = TransferData::get_deposit_signer_seeds(
+        authority.key(), 
+        destination.key(),
+        &vault_index_bytes, 
+        &transfer_index_bytes, 
+        mint.key(), 
+        token_program.key(), 
+        deposit_bump
+    );
     pinocchio_token::instructions::Transfer {
         from: deposit,
         to: destination,

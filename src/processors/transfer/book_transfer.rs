@@ -1,4 +1,4 @@
-use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, msg, program_error::ProgramError, pubkey::{Pubkey, pubkey_eq}, seeds, sysvars::{Sysvar, rent::Rent}};
+use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, msg, program_error::ProgramError, pubkey::{Pubkey, pubkey_eq}, sysvars::{Sysvar, rent::Rent}};
 use pinocchio_system::instructions::CreateAccount;
 use pinocchio_token::{instructions::Transfer, state::TokenAccount};
 
@@ -69,7 +69,7 @@ pub fn process_book_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) 
         return Err(PimeError::VaultWarmupViolation.into());
     }
 
-    let vault_pda = VaultData::get_vault_pda(vault_data.key());
+    let vault_pda = VaultData::get_vault_pda(authority.key(), vault_index, mint.key(), token_program.key());
     if !pubkey_eq(vault.key(), &vault_pda.0) {
         msg!("Incorrect vault PDA");
         return Err(PimeError::IncorrectPDA.into());
@@ -89,7 +89,7 @@ pub fn process_book_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) 
     // SAFETY vault is read-only by this call, and not used after the Token Program CPI.
     // let vault_account = unsafe { TokenAccount::from_bytes_unchecked(vault.borrow_data_unchecked()) };
 
-    let transfer_pda = TransferData::get_transfer_pda(vault_data.key(), &transfer_index);
+    let transfer_pda = TransferData::get_transfer_pda(authority.key(), destination, vault_index, transfer_index, mint.key(), token_program.key());
     if !pubkey_eq(transfer.key(), &transfer_pda.0) {
         msg!("Incorrect transfer PDA");
         return Err(PimeError::IncorrectPDA.into());
@@ -99,7 +99,7 @@ pub fn process_book_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) 
         return Err(ProgramError::AccountAlreadyInitialized);
     }
 
-    let deposit_pda = TransferData::get_deposit_pda(transfer.key());
+    let deposit_pda = TransferData::get_deposit_pda(authority.key(), destination, vault_index, transfer_index, mint.key(), token_program.key());
     if !pubkey_eq(deposit.key(), &deposit_pda.0) {
         msg!("Incorrect deposit PDA");
         return Err(PimeError::IncorrectPDA.into());
@@ -110,9 +110,18 @@ pub fn process_book_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) 
     }
 
     //      Create transfer account and assign data
-    let transfer_bump = &[transfer_pda.1];
     let transfer_index_bytes = transfer_index.to_le_bytes();
-    let transfer_seed = seeds!(&vault_data_pda.0, &transfer_index_bytes, transfer_bump);
+    let vault_index_bytes = vault_index.to_le_bytes();
+    let transfer_bump = &[transfer_pda.1];
+    let transfer_seed = TransferData::get_transfer_signer_seeds(
+        authority.key(), 
+        destination, 
+        &vault_index_bytes, 
+        &transfer_index_bytes, 
+        mint.key(), 
+        token_program.key(), 
+        transfer_bump
+    );
     CreateAccount {
         from: authority,
         to: transfer,
@@ -135,17 +144,32 @@ pub fn process_book_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) 
         ));
 
     //      Create deposit token account
+    let deposit_bump = &[deposit_pda.1];
+    let deposit_signer_seeds = TransferData::get_deposit_signer_seeds(
+        authority.key(), 
+        destination, 
+        &vault_index_bytes, 
+        &transfer_index_bytes,
+        mint.key(), 
+        token_program.key(), 
+        deposit_bump
+    );
     create_deposit_account(
-        /* payer */ authority, 
-        /* deposit */ deposit, 
-        /* transfer */ transfer, 
-        /* deposit_bump */ &[deposit_pda.1], 
+        /* payer */ authority,
+        /* deposit */ deposit,
         /* mint */ mint, 
-        /* token_program */ token_program.key())?;
+        /* token_program */ token_program.key(),
+        /* deposit signer */ &Signer::from(&deposit_signer_seeds)
+    )?;
 
     //      Transfer from vault to deposit
-    let vault_pda_seed = &[vault_pda.1]; // Prevent dropping
-    let vault_signer_seed = seeds!(vault_data.key(), vault_pda_seed);
+    let vault_bump = &[vault_pda.1]; // Prevent dropping
+    let vault_signer_seed = VaultData::get_vault_signer_seeds(
+        authority.key(), 
+        &vault_index_bytes, 
+        mint.key(), 
+        token_program.key(), 
+        vault_bump);
     Transfer {
         from: vault,
         to: deposit,

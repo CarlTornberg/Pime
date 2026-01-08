@@ -88,8 +88,8 @@ When a transaction is booked, the user's assets from the specified vault are mov
 ## PDA's
 * Vault Data    - b"vault_data", vault_index, authority, mint, token_program
 * Vault         - b"vault", vault_index, authority, mint, token_program
-* Transfer      - b"transfer", vault_index, transfer_index, authority, mint, token_program
-* Deposit       - b"deposit", vault_index, transfer_index, authority, mint, token_program
+* Transfer      - b"transfer", vault_index, transfer_index, destination, authority, mint, token_program
+* Deposit       - b"deposit", vault_index, transfer_index, destination, authority, mint, token_program
 
 
 ## Timeline

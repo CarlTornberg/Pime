@@ -1,4 +1,4 @@
-use pinocchio::{account_info::AccountInfo, instruction::Signer, msg, program_error::ProgramError, pubkey::pubkey_eq, seeds, sysvars::{Sysvar, clock::Clock}};
+use pinocchio::{account_info::AccountInfo, instruction::Signer, msg, program_error::ProgramError, pubkey::pubkey_eq, sysvars::{Sysvar, clock::Clock}};
 
 use crate::{errors::PimeError, states::{VaultData, VaultHistory, from_bytes}};
 
@@ -66,7 +66,7 @@ pub fn transfer(
 
     //     Vault
 
-    let vault_pda = VaultData::get_vault_pda(&vault_data_pda.0);
+    let vault_pda = VaultData::get_vault_pda(authority.key(), vault_index, mint.key(), token_program.key());
     if !pubkey_eq(vault.key(), &vault_pda.0) {
         return Err(PimeError::IncorrectPDA.into());
     }
@@ -134,7 +134,14 @@ pub fn transfer(
             }
 
             let vault_bump = &[vault_pda.1];
-            let vault_signer_seeds = seeds!( &vault_data_pda.0, vault_bump );
+            let vault_index_bytes = vault_index.to_le_bytes();
+            let vault_signer_seeds = VaultData::get_vault_signer_seeds(
+                authority.key(), 
+                &vault_index_bytes,
+                mint.key(), 
+                token_program.key(), 
+                vault_bump
+            );
             return pinocchio_token::instructions::Transfer {
                 from: vault,
                 to, 

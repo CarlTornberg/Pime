@@ -13,6 +13,7 @@ mod litesvm_tests {
     use pime::states::transfer_data::TransferData;
     use pime::states::{VaultData, VaultHistory, as_bytes, from_bytes};
     use solana_sdk::message::{AccountMeta, Instruction};
+    use solana_sdk::pubkey::PUBKEY_BYTES;
     use solana_sdk::{message::Message, native_token::LAMPORTS_PER_SOL, program_pack::Pack, pubkey::Pubkey, signature::Keypair, signer::Signer, transaction::Transaction};
     use spl_associated_token_account_interface::address::{get_associated_token_address, get_associated_token_address_with_program_id};
     use spl_associated_token_account_interface::instruction::create_associated_token_account_idempotent;
@@ -94,7 +95,7 @@ mod litesvm_tests {
         let deposit_amount = 4_000;
         let deposit_inst = DepositToVaultInstructionData::new(
             /* vault owner */ alice.pubkey().to_bytes(), 
-            /* index */ create_vault_instruction_data.index(), 
+            /* vault index */ create_vault_instruction_data.vault_index(), 
             /* deposit amount */ deposit_amount);
 
         deposit_to_vault(
@@ -153,7 +154,7 @@ mod litesvm_tests {
         let deposit_amount = 4_000;
         let deposit_inst = DepositToVaultInstructionData::new(
             /* vault owner */ alice.pubkey().to_bytes(), 
-            /* index */ create_vault_instruction_data.index(), 
+            /* vault index */ create_vault_instruction_data.vault_index(), 
             /* deposit amount */ deposit_amount);
 
         deposit_to_vault(
@@ -165,7 +166,7 @@ mod litesvm_tests {
 
         let withdraw_inst = WithdrawFromVaultInstructionData::new(
             /* amount */ 1, 
-            /* vault index */ create_vault_instruction_data.index());
+            /* vault index */ create_vault_instruction_data.vault_index());
 
         withdraw_from_vault(
             /* svm */ &mut svm,
@@ -222,7 +223,7 @@ mod litesvm_tests {
         let deposit_amount = 500;
         let deposit_to_vault_inst_data = DepositToVaultInstructionData::new(
             /* vault owner */ alice.pubkey().to_bytes(), 
-            /* index */ create_vault_inst_data.index(), 
+            /* vault_index */ create_vault_inst_data.vault_index(), 
             /* amount */ deposit_amount);
         deposit_to_vault(&mut svm, 
             /* from_acc */ &alice_ata, 
@@ -235,7 +236,7 @@ mod litesvm_tests {
         let book_transfer_inst_data = BookTransferInstructionData::new(
             /* amount */ transfer_amount, 
             /* destination */ receiver_ata.to_bytes(),
-            /* vault_index */ create_vault_inst_data.index(), 
+            /* vault_index */ create_vault_inst_data.vault_index(), 
             /* transfer_index */ 1, 
             /* warmup */ 1, 
             /* validity*/ 1);
@@ -247,10 +248,20 @@ mod litesvm_tests {
             /* token_program */ &TOKEN_PROGRAM);
 
         // Assert vault and deposit
-        let vault_data = find_vault_data_pda(&alice.pubkey(), create_vault_inst_data.index(), &mint.pubkey(), &TOKEN_PROGRAM);
-        let vault = find_vault_pda(&vault_data.0);
-        let transfer = find_transfer_pda(&vault_data.0, book_transfer_inst_data.transfer_index());
-        let deposit = find_deposit_pda(&transfer.0);
+        let vault = find_vault_pda(
+            book_transfer_inst_data.vault_index(), 
+            alice.pubkey().as_array(), 
+            mint.pubkey().as_array(),
+            TOKEN_PROGRAM.as_array()
+        );
+        let deposit = find_deposit_pda(
+            book_transfer_inst_data.vault_index(), 
+            book_transfer_inst_data.transfer_index(),
+            alice.pubkey().as_array(),
+            &book_transfer_inst_data.destination,
+            mint.pubkey().as_array(),
+            TOKEN_PROGRAM.as_array()
+        );
         let vault_acc = TokenAccount::unpack(&svm.get_account(&vault.0).unwrap().data).unwrap();
         let deposit_acc = TokenAccount::unpack(&svm.get_account(&deposit.0).unwrap().data).unwrap();
 
@@ -304,7 +315,7 @@ mod litesvm_tests {
         let deposit_amount = 500;
         let deposit_to_vault_inst_data = DepositToVaultInstructionData::new(
             /* vault owner */ alice.pubkey().to_bytes(), 
-            /* index */ create_vault_inst_data.index(), 
+            /* vault index */ create_vault_inst_data.vault_index(), 
             /* amount */ deposit_amount);
         deposit_to_vault(&mut svm, 
             /* from_acc */ &alice_ata, 
@@ -317,7 +328,7 @@ mod litesvm_tests {
         let book_transfer_inst_data = BookTransferInstructionData::new(
             /* amount */ transfer_amount, 
             /* destination */ destination_ata.to_bytes(),
-            /* vault_index */ create_vault_inst_data.index(), 
+            /* vault_index */ create_vault_inst_data.vault_index(), 
             /* transfer_index */ 1, 
             /* warmup */ 0, 
             /* validity*/ 100);
@@ -386,7 +397,7 @@ mod litesvm_tests {
         let deposit_amount = 500;
         let deposit_to_vault_inst_data = DepositToVaultInstructionData::new(
             /* vault owner */ alice.pubkey().to_bytes(), 
-            /* index */ create_vault_inst_data.index(), 
+            /* vault index */ create_vault_inst_data.vault_index(), 
             /* amount */ deposit_amount);
         deposit_to_vault(&mut svm, 
             /* from_acc */ &alice_ata, 
@@ -399,7 +410,7 @@ mod litesvm_tests {
         let book_transfer_inst_data = BookTransferInstructionData::new(
             /* amount */ transfer_amount, 
             /* destination */ destination_ata.to_bytes(),
-            /* vault_index */ create_vault_inst_data.index(), 
+            /* vault_index */ create_vault_inst_data.vault_index(), 
             /* transfer_index */ 1, 
             /* warmup */ 0, 
             /* validity*/ 100);
@@ -413,6 +424,7 @@ mod litesvm_tests {
         let unbook_transfer_inst_data = UnbookTransferInstructionData::new(
             book_transfer_inst_data.vault_index(), 
             book_transfer_inst_data.transfer_index(),
+            destination_ata.to_bytes(),
         );
         unbook_transfer(&mut svm, 
             /* inst data */ &unbook_transfer_inst_data, 
@@ -501,19 +513,25 @@ mod litesvm_tests {
     fn create_new_vault(
         svm: &mut LiteSVM, 
         authority: &Keypair, 
-        instuction_data: &CreateVaultInstructionData,
+        inst_data: &CreateVaultInstructionData,
         mint: &Pubkey, 
     ) {
         let vault_data = find_vault_data_pda(
-            &authority.pubkey(), 
-            instuction_data.index(), 
-            mint, 
-            &TOKEN_PROGRAM);
-        let vault = find_vault_pda(&vault_data.0);
+            inst_data.vault_index(), 
+            authority.pubkey().as_array(), 
+            mint.as_array(),
+            TOKEN_PROGRAM.as_array()
+        );
+        let vault = find_vault_pda(
+            inst_data.vault_index(), 
+            authority.pubkey().as_array(), 
+            mint.as_array(),
+            TOKEN_PROGRAM.as_array()
+        );
 
-        let max_transactions = instuction_data.max_transactions();
+        let max_transactions = inst_data.max_transactions();
 
-        let data = as_bytes(instuction_data);
+        let data = as_bytes(inst_data);
 
         let create_vault_inst = Instruction::new_with_bytes(
             /* program id*/     PIME_ID, 
@@ -542,23 +560,25 @@ mod litesvm_tests {
         assert_eq!(vault_data_bytes.len(), size_of::<VaultData>() + size_of::<VaultHistory>() * max_transactions as usize);
         // # SAFETY Data bytes are of type Vault
         let vault_acc = from_bytes::<VaultData>(&vault_data_bytes[0.. size_of::<VaultData>()]);
-        assert_eq!(vault_acc.unwrap().timeframe(), instuction_data.timeframe());
-        let vault_acc = pime::states::from_bytes::<VaultData>(&vault_data_bytes);
-        assert_eq!(vault_acc.unwrap().max_transactions(), instuction_data.max_transactions());
-        assert_eq!(vault_acc.unwrap().max_amount(), instuction_data.max_amount());
+        assert_eq!(vault_acc.unwrap().timeframe(), inst_data.timeframe());
+        assert_eq!(vault_acc.unwrap().max_transactions(), inst_data.max_transactions());
+        assert_eq!(vault_acc.unwrap().max_amount(), inst_data.max_amount());
         for d in &vault_data_bytes[size_of::<VaultData>() ..] {
             assert_eq!(*d, 0); // Check that transaction history bytes are 0'd out.
         }
     }
     
-    fn deposit_to_vault(svm: &mut LiteSVM, from_acc: &Pubkey, from_authority: &Keypair, mint: &Pubkey, inst: &DepositToVaultInstructionData) {
-        let buf = as_bytes(inst);
-        println!("deposit instruction inst index: {}, amount: {}", inst.index(), inst.amount());
+    fn deposit_to_vault(svm: &mut LiteSVM, from_acc: &Pubkey, from_authority: &Keypair, mint: &Pubkey, inst_data: &DepositToVaultInstructionData) {
+        let buf = as_bytes(inst_data);
+        println!("deposit instruction inst index: {}, amount: {}", inst_data.vault_index(), inst_data.amount());
         println!("deposit instruction bytes {:?}", buf);
 
-        let vault_owner = Pubkey::new_from_array(inst.vault_owner());
-        let vault_data = find_vault_data_pda(&vault_owner, inst.index(), mint, &TOKEN_PROGRAM).0;
-        let vault = find_vault_pda(&vault_data).0;
+        let vault = find_vault_pda(
+            inst_data.vault_index(), 
+            from_authority.pubkey().as_array(), 
+            mint.as_array(),
+            TOKEN_PROGRAM.as_array()
+        );
 
         let deposit_inst = Instruction::new_with_bytes(
             PIME_ID,
@@ -566,7 +586,7 @@ mod litesvm_tests {
             [
                 AccountMeta::new(from_authority.pubkey(), true),
                 AccountMeta::new(*from_acc, false),
-                AccountMeta::new(vault, false),
+                AccountMeta::new(vault.0, false),
                 AccountMeta::new_readonly(*mint, false),
                 AccountMeta::new_readonly(TOKEN_PROGRAM, false),
                 AccountMeta::new_readonly(solana_system_interface::program::ID, false),
@@ -580,31 +600,37 @@ mod litesvm_tests {
             panic!(" Failed to deposit to vault using token interface: {:#?}", e);
         }
 
-        let vault_acc = svm.get_account(&vault).unwrap();
+        let vault_acc = svm.get_account(&vault.0).unwrap();
         let vault_token = TokenAccount::unpack(&vault_acc.data).unwrap();
-        assert_eq!(vault_token.amount, inst.amount());
+        assert_eq!(vault_token.amount, inst_data.amount());
     }
 
     fn withdraw_from_vault(
         svm: &mut LiteSVM, 
-        vault_authority: &Keypair, 
+        authority: &Keypair, 
         to: &Pubkey,
         mint: &Pubkey, 
         token_program: &Pubkey, 
-        inst: &WithdrawFromVaultInstructionData) {
+        inst_data: &WithdrawFromVaultInstructionData) {
 
-        let inst_bytes = as_bytes(inst);
-
+        let inst_bytes = as_bytes(inst_data);
+        
         let vault_data = find_vault_data_pda(
-            &vault_authority.pubkey(), 
-            inst.vault_index(), 
-            mint, 
-            token_program).0;
-        let vault = find_vault_pda(&vault_data).0;
+            inst_data.vault_index(), 
+            authority.pubkey().as_array(), 
+            mint.as_array(),
+            TOKEN_PROGRAM.as_array()
+        );
+        let vault = find_vault_pda(
+            inst_data.vault_index(), 
+            authority.pubkey().as_array(), 
+            mint.as_array(),
+            TOKEN_PROGRAM.as_array()
+        );
 
         let to_ata_account = TokenAccount::unpack(&svm.get_account(to).unwrap().data).unwrap();
         let to_pre_amount = to_ata_account.amount;
-        let vault_account = TokenAccount::unpack(&svm.get_account(&vault).unwrap().data).unwrap();
+        let vault_account = TokenAccount::unpack(&svm.get_account(&vault.0).unwrap().data).unwrap();
         let vault_pre_amount = vault_account.amount;
 
 
@@ -612,19 +638,19 @@ mod litesvm_tests {
             PIME_ID, 
             inst_bytes, 
             [
-                AccountMeta::new(vault_authority.pubkey(), true),
-                AccountMeta::new(vault_data, false),
-                AccountMeta::new(vault, false),
+                AccountMeta::new(authority.pubkey(), true),
+                AccountMeta::new(vault_data.0, false),
+                AccountMeta::new(vault.0, false),
                 AccountMeta::new(*to, false),
                 AccountMeta::new_readonly(*mint, false),
                 AccountMeta::new_readonly(*token_program, false),
             ].to_vec());
 
         let tx = Transaction::new(
-            &[vault_authority], 
+            &[authority], 
             Message::new(
                 &[withdraw_inst], 
-                Some(&vault_authority.pubkey())
+                Some(&authority.pubkey())
             ), 
             svm.latest_blockhash());
 
@@ -633,18 +659,45 @@ mod litesvm_tests {
         }
 
         let to_ata_account = TokenAccount::unpack(&svm.get_account(to).unwrap().data).unwrap();
-        let vault_account = TokenAccount::unpack(&svm.get_account(&vault).unwrap().data).unwrap();
+        let vault_account = TokenAccount::unpack(&svm.get_account(&vault.0).unwrap().data).unwrap();
 
-        assert_eq!(to_pre_amount + inst.amount(), to_ata_account.amount);
-        assert_eq!(vault_account.amount, vault_pre_amount - inst.amount());
+        assert_eq!(to_pre_amount + inst_data.amount(), to_ata_account.amount);
+        assert_eq!(vault_account.amount, vault_pre_amount - inst_data.amount());
     }
 
     fn book_transfer(svm: &mut LiteSVM, inst_data: &BookTransferInstructionData, authority: &Keypair, mint: &Pubkey, token_program: &Pubkey ) {
         let inst_bytes = as_bytes(inst_data);
-        let vault_data = find_vault_data_pda(&authority.pubkey(), inst_data.vault_index(), mint, token_program);
-        let vault = find_vault_pda(&vault_data.0);
-        let transfer = find_transfer_pda(&vault_data.0, inst_data.transfer_index());
-        let deposit = find_deposit_pda(&transfer.0);
+            
+        let vault_data = find_vault_data_pda(
+            inst_data.vault_index(), 
+            authority.pubkey().as_array(), 
+            mint.as_array(),
+            TOKEN_PROGRAM.as_array()
+        );
+        let vault = find_vault_pda(
+            inst_data.vault_index(), 
+            authority.pubkey().as_array(), 
+            mint.as_array(),
+            TOKEN_PROGRAM.as_array()
+        );
+        let transfer = find_transfer_pda(
+            inst_data.vault_index(), 
+            inst_data.transfer_index(),
+            authority.pubkey().as_array(),
+            &inst_data.destination,
+            mint.as_array(),
+            TOKEN_PROGRAM.as_array()
+        );
+        let deposit = find_deposit_pda(
+            inst_data.vault_index(), 
+            inst_data.transfer_index(),
+            authority.pubkey().as_array(),
+            &inst_data.destination,
+            mint.as_array(),
+            TOKEN_PROGRAM.as_array()
+        );
+        println!("Transfer PDA: {}", transfer.0);
+
 
         let vault_acc_pre_val = if let Some(a) = &svm.get_account(&vault.0) {
             TokenAccount::unpack(&a.data).unwrap().amount
@@ -685,6 +738,10 @@ mod litesvm_tests {
 
         let vault_acc = TokenAccount::unpack(&svm.get_account(&vault.0).unwrap().data).unwrap();
         let deposit_acc = TokenAccount::unpack(&svm.get_account(&deposit.0).unwrap().data).unwrap();
+        let t = svm.get_account(&transfer.0).unwrap();
+        let transfer_acc = from_bytes::<TransferData>(&t.data).unwrap();
+
+        assert_eq!(transfer_acc.amount(), inst_data.amount());
 
         // Check that the tokens are transferred out of the vault.
         assert_eq!(vault_acc.amount, vault_acc_pre_val - inst_data.amount()); 
@@ -695,10 +752,29 @@ mod litesvm_tests {
 
     fn execute_transfer(svm: &mut LiteSVM, inst_data: &ExecuteTransferInstructionData, authority: &Keypair, destination: &Pubkey, destination_owner: &Pubkey, mint: &Pubkey, token_program: &Pubkey) {
         let inst_bytes = as_bytes(inst_data);
-        let vault_data = find_vault_data_pda(&authority.pubkey(), inst_data.vault_index(), mint, token_program);
-        let vault = find_vault_pda(&vault_data.0);
-        let transfer = find_transfer_pda(&vault_data.0, inst_data.transfer_index());
-        let deposit = find_deposit_pda(&transfer.0);
+
+        let vault = find_vault_pda(
+            inst_data.vault_index(), 
+            authority.pubkey().as_array(), 
+            mint.as_array(),
+            TOKEN_PROGRAM.as_array()
+        );
+        let transfer = find_transfer_pda(
+            inst_data.vault_index(), 
+            inst_data.transfer_index(),
+            authority.pubkey().as_array(),
+            destination.as_array(),
+            mint.as_array(),
+            TOKEN_PROGRAM.as_array()
+        );
+        let deposit = find_deposit_pda(
+            inst_data.vault_index(), 
+            inst_data.transfer_index(),
+            authority.pubkey().as_array(),
+            destination.as_array(),
+            mint.as_array(),
+            TOKEN_PROGRAM.as_array()
+        );
 
         let deposit_acc_pre_val = if let Some(a) = &svm.get_account(&deposit.0) {
             TokenAccount::unpack(&a.data).unwrap().amount
@@ -759,10 +835,30 @@ mod litesvm_tests {
     }
 
     fn unbook_transfer(svm: &mut LiteSVM, inst_data: &UnbookTransferInstructionData, authority: &Keypair, mint: &Pubkey, token_program: &Pubkey) {
-        let vault_data = find_vault_data_pda(&authority.pubkey(), inst_data.vault_index(), mint, token_program);
-        let vault = find_vault_pda(&vault_data.0);
-        let transfer = find_transfer_pda(&vault_data.0, inst_data.transfer_index());
-        let deposit = find_deposit_pda(&transfer.0);
+        
+        let vault = find_vault_pda(
+            inst_data.vault_index(), 
+            authority.pubkey().as_array(), 
+            mint.as_array(),
+            TOKEN_PROGRAM.as_array()
+        );
+        let transfer = find_transfer_pda(
+            inst_data.vault_index(), 
+            inst_data.transfer_index(),
+            authority.pubkey().as_array(),
+            &inst_data.destination,
+            mint.as_array(),
+            TOKEN_PROGRAM.as_array()
+        );
+        let deposit = find_deposit_pda(
+            inst_data.vault_index(), 
+            inst_data.transfer_index(),
+            authority.pubkey().as_array(),
+            &inst_data.destination,
+            mint.as_array(),
+            TOKEN_PROGRAM.as_array()
+        );
+        println!("Transfer PDA: {}", transfer.0);
 
         let inst_bytes = as_bytes(inst_data);
 
@@ -771,7 +867,6 @@ mod litesvm_tests {
             inst_bytes, 
             [
                 AccountMeta::new(authority.pubkey(), true),
-                AccountMeta::new_readonly(vault_data.0, false),
                 AccountMeta::new(vault.0, false),
                 AccountMeta::new(transfer.0, false),
                 AccountMeta::new(deposit.0, false),
@@ -786,7 +881,7 @@ mod litesvm_tests {
         );
 
         if let Err(e) = svm.send_transaction(tx) {
-            panic!("Failed to  unbook transfer: {:#?}", e);
+            panic!("Failed to unbook transfer: {:#?}", e);
         }
 
         if svm.get_account(&transfer.0).is_some() {
@@ -798,35 +893,50 @@ mod litesvm_tests {
         }
     }
 
-    fn find_vault_data_pda(authority: &Pubkey, index: u64, mint: &Pubkey, token_program: &Pubkey) -> (Pubkey, u8) {
+    fn find_vault_data_pda(vault_index: u64, authority: &[u8; PUBKEY_BYTES], mint: &[u8; PUBKEY_BYTES], token_program: &[u8; PUBKEY_BYTES]) -> (Pubkey, u8) {
         Pubkey::find_program_address(&[
             VaultData::VAULT_DATA_SEED,
-            &authority.to_bytes(),
-            &index.to_le_bytes(),
-            &mint.to_bytes(),
-            &token_program.to_bytes(),
+            &vault_index.to_le_bytes(),
+            authority,
+            mint,
+            token_program,
         ], 
             &Pubkey::new_from_array(pime::ID))
     }
 
-    fn find_vault_pda(vault_data: &Pubkey) -> (Pubkey, u8) {
+    fn find_vault_pda(vault_index: u64, authority: &[u8; PUBKEY_BYTES], mint: &[u8; PUBKEY_BYTES], token_program: &[u8; PUBKEY_BYTES]) -> (Pubkey, u8) {
         Pubkey::find_program_address(&[
-            &vault_data.to_bytes(),
+            VaultData::VAULT_SEED,
+            &vault_index.to_le_bytes(),
+            authority,
+            mint,
+            token_program,
         ],
             &Pubkey::new_from_array(pime::ID))
     }
 
-    fn find_transfer_pda(vault_data: &Pubkey, index: u64) -> (Pubkey, u8) {
+    fn find_transfer_pda(vault_index: u64, transfer_index: u64, authority: &[u8; PUBKEY_BYTES], destination: &[u8; PUBKEY_BYTES], mint: &[u8; PUBKEY_BYTES], token_program: &[u8; PUBKEY_BYTES] ) -> (Pubkey, u8) {
         Pubkey::find_program_address(&[
-            &vault_data.to_bytes(),
-            &index.to_le_bytes(),
+            TransferData::TRANSFER_SEED,
+            &vault_index.to_le_bytes(),
+            &transfer_index.to_le_bytes(),
+            authority,
+            destination,
+            mint,
+            token_program,
         ],
             &Pubkey::new_from_array(pime::ID))
     }
 
-    fn find_deposit_pda(transfer: &Pubkey) -> (Pubkey, u8) {
+    fn find_deposit_pda(vault_index: u64, transfer_index: u64, authority: &[u8; PUBKEY_BYTES], destination: &[u8; PUBKEY_BYTES], mint: &[u8; PUBKEY_BYTES], token_program: &[u8; PUBKEY_BYTES] ) -> (Pubkey, u8) {
         Pubkey::find_program_address(&[
-            &transfer.to_bytes(),
+            TransferData::DEPOSIT_SEED,
+            &vault_index.to_le_bytes(),
+            &transfer_index.to_le_bytes(),
+            authority,
+            destination,
+            mint,
+            token_program,
         ],
             &Pubkey::new_from_array(pime::ID))
     }

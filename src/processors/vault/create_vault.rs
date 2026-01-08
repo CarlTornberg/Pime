@@ -1,4 +1,4 @@
-use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, msg, program_error::ProgramError, pubkey::pubkey_eq, seeds, sysvars::clock::UnixTimestamp};
+use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, msg, program_error::ProgramError, pubkey::pubkey_eq, sysvars::clock::UnixTimestamp};
 use crate::{errors::PimeError, processors::shared, states::VaultData};
 
 /// Create new vault given a vault index, authority, mint (with corresponding token program), and
@@ -7,7 +7,7 @@ pub fn process_create_vault(accounts: &[AccountInfo], instruction_data: &[u8]) -
 
     // Validate instruction data
     let (
-        index, 
+        vault_index, 
         timeframe, 
         max_transactions, 
         max_amount, 
@@ -58,27 +58,28 @@ pub fn process_create_vault(accounts: &[AccountInfo], instruction_data: &[u8]) -
 
     //    Vault Data
 
-    let vault_data_pda = VaultData::get_vault_data_pda(authority.key(), index, mint.key(), token_program.key());
+    let vault_data_pda = VaultData::get_vault_data_pda(authority.key(), vault_index, mint.key(), token_program.key());
     if !pubkey_eq(&vault_data_pda.0, vault_data.key()) {
+        msg!("Vault data PDA incorrect");
         return Err(PimeError::IncorrectPDA.into());
     }
     if vault_data.lamports() != 0 {
+        msg!("Vault data is already initialized.");
         return Err(ProgramError::AccountAlreadyInitialized);
     }
     if !vault_data.is_writable() {
+        msg!("Vault data is not mutable.");
         return Err(ProgramError::Immutable);
     }
 
     let vault_data_pda_bump = &[vault_data_pda.1]; // prevent dropping
-    let index_bytes = index.to_le_bytes(); // prevent dropping
-    let vault_data_signer_seeds = seeds!(
-        VaultData::VAULT_DATA_SEED,
-        authority.key(),
-        &index_bytes,
-        mint.key(),
-        token_program.key(),
-        vault_data_pda_bump
-    );
+    let vault_index_bytes = vault_index.to_le_bytes();
+    let vault_data_signer_seeds = VaultData::get_vault_data_signer_seeds(
+        authority.key(), 
+        &vault_index_bytes, 
+        mint.key(), 
+        token_program.key(), 
+        vault_data_pda_bump);
     shared::create_vault_data_account::process_create_vault_data_account(
         authority,
         vault_data,
@@ -87,11 +88,11 @@ pub fn process_create_vault(accounts: &[AccountInfo], instruction_data: &[u8]) -
         max_amount,
         transfer_min_warmup,
         tranfer_max_window,
-        Signer::from(&vault_data_signer_seeds),
+        &Signer::from(&vault_data_signer_seeds),
     )?;
     
     //   Vault
-    let vault_pda = VaultData::get_vault_pda(&vault_data_pda.0);
+    let vault_pda = VaultData::get_vault_pda(authority.key(), vault_index, mint.key(), token_program.key());
     if !pubkey_eq(&vault_pda.0, vault.key()) {
         return Err(PimeError::IncorrectPDA.into());
     }
@@ -101,13 +102,19 @@ pub fn process_create_vault(accounts: &[AccountInfo], instruction_data: &[u8]) -
     }
     
     if vault.lamports() == 0 { // If account has not been initialized, init it
+        let vault_bump = &[vault_pda.1];
+        let vault_seeds = VaultData::get_vault_signer_seeds(
+            authority.key(), 
+            &vault_index_bytes, 
+            mint.key(), 
+            token_program.key(), 
+            vault_bump);
         shared::create_vault_account::create_vault_account(
-            /* payer */ authority,
-            /* vault */ vault,
-            /* vault bump */ vault_pda.1,
-            /* vault data pubkey */ vault_data.key(),
-            /* mint */ mint,
-            /* token program */ token_program.key(),
+            authority,
+            vault,
+            mint,
+            token_program.key(),
+            &Signer::from(&vault_seeds),
         )?;
     }
     else if !vault.is_owned_by(&pinocchio_token::ID) { // Force vault to be owned by token program

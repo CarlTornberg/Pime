@@ -1,4 +1,4 @@
-use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, msg, program_error::ProgramError, pubkey::pubkey_eq, seeds};
+use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, msg, program_error::ProgramError, pubkey::{Pubkey, pubkey_eq}};
 use pinocchio_token::state::TokenAccount;
 
 use crate::{errors::PimeError, interface::instructions::unbook_transfer_instruction::UnbookTransferInstructionData, states::{VaultData, transfer_data::TransferData}};
@@ -7,19 +7,20 @@ use crate::{errors::PimeError, interface::instructions::unbook_transfer_instruct
 /// If the booking was never proceeded, the assets are transferred back to its owner.
 pub fn unbook_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) -> ProgramResult {
     
-    // Deserialize intruction data
-    let (vault_index, transfer_index) = if instruction_data.len() < size_of::<UnbookTransferInstructionData>() - size_of::<u8>() {
+    // Deserialize instruction data
+    let (vault_index, transfer_index, destination) = if instruction_data.len() < size_of::<UnbookTransferInstructionData>() - size_of::<u8>() {
         return Err(ProgramError::InvalidInstructionData);
     }
     else {
         (
             u64::from_le_bytes( unsafe { *(instruction_data.as_ptr() as *const [u8; size_of::<u64>()]) }),
-            u64::from_le_bytes( unsafe { *(instruction_data.as_ptr().add(size_of::<u64>()) as *const [u8; size_of::<u64>()]) })
+            u64::from_le_bytes( unsafe { *(instruction_data.as_ptr().add(size_of::<u64>()) as *const [u8; size_of::<u64>()]) }),
+            unsafe {&*(instruction_data.as_ptr().add(2 * size_of::<u64>()) as *const Pubkey)}
         )
     };
 
     // Safety checks on accounts
-    let [authority, vault_data, vault, transfer, deposit, mint, token_program, _remaining @ ..] = accounts else {
+    let [authority, vault, transfer, deposit, mint, token_program, _remaining @ ..] = accounts else {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
 
@@ -28,26 +29,7 @@ pub fn unbook_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) -> Pro
         return Err(ProgramError::MissingRequiredSignature);
     }
 
-    let vault_data_pda = VaultData::get_vault_data_pda(
-        /* authority */ authority.key(), 
-        /* index */ vault_index, 
-        /* mint */ mint.key(), 
-        /* token_program */ token_program.key()
-    );
-    if !pubkey_eq(&vault_data_pda.0, vault_data.key()) {
-        msg!("Vault data PDA incorrect.");
-        return Err(PimeError::IncorrectPDA.into());
-    }
-    if vault_data.lamports() == 0 {
-        msg!("Vault data is not initialized.");
-        return Err(ProgramError::UninitializedAccount);
-    }
-    if !vault_data.is_owned_by(&crate::ID) {
-        msg!("Vault data is not owned by this program.");
-        return Err(ProgramError::IllegalOwner);
-    }
-
-    let vault_pda = VaultData::get_vault_pda(vault_data.key());
+    let vault_pda = VaultData::get_vault_pda(authority.key(), vault_index, mint.key(), token_program.key());
     if !pubkey_eq(&vault_pda.0, vault.key()) {
         msg!("Vault PDA incorrect.");
         return Err(PimeError::IncorrectPDA.into());
@@ -61,7 +43,14 @@ pub fn unbook_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) -> Pro
         return Err(ProgramError::IllegalOwner);
     }
 
-    let transfer_pda = TransferData::get_transfer_pda(vault_data.key(), &transfer_index);
+    let transfer_pda = TransferData::get_transfer_pda(
+        authority.key(), 
+        destination, 
+        vault_index, 
+        transfer_index, 
+        mint.key(), 
+        token_program.key()
+    );
     if !pubkey_eq(&transfer_pda.0, transfer.key()) {
         msg!("Transfer PDA incorrect.");
         return Err(PimeError::IncorrectPDA.into());
@@ -75,7 +64,7 @@ pub fn unbook_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) -> Pro
         return Err(ProgramError::IllegalOwner);
     }
 
-    let deposit_pda = TransferData::get_deposit_pda(transfer.key());
+    let deposit_pda = TransferData::get_deposit_pda(authority.key(), destination, vault_index, transfer_index, mint.key(), token_program.key());
     if !pubkey_eq(&deposit_pda.0, deposit.key()) {
         msg!("Deposit PDA incorrect.");
         return Err(PimeError::IncorrectPDA.into());
@@ -104,8 +93,19 @@ pub fn unbook_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) -> Pro
         return Err(ProgramError::AccountDataTooSmall);
     }
     let vault_acc = unsafe {&*(vault.data_ptr() as *const TokenAccount)};
+
+    let vault_index_bytes = vault_index.to_le_bytes();
+    let transfer_index_bytes = transfer_index.to_le_bytes();
     let deposit_bump = &[deposit_pda.1];
-    let deposit_seeds = seeds!(transfer.key(), deposit_bump);
+    let deposit_seeds = TransferData::get_deposit_signer_seeds(
+        authority.key(), 
+        destination,
+        &vault_index_bytes,
+        & transfer_index_bytes, 
+        mint.key(), 
+        token_program.key(), 
+        deposit_bump
+    );
 
 
     //      ** BUSINESS LOGIC **
