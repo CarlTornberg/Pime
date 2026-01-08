@@ -696,8 +696,6 @@ mod litesvm_tests {
             mint.as_array(),
             TOKEN_PROGRAM.as_array()
         );
-        println!("Transfer PDA: {}", transfer.0);
-
 
         let vault_acc_pre_val = if let Some(a) = &svm.get_account(&vault.0) {
             TokenAccount::unpack(&a.data).unwrap().amount
@@ -858,7 +856,6 @@ mod litesvm_tests {
             mint.as_array(),
             TOKEN_PROGRAM.as_array()
         );
-        println!("Transfer PDA: {}", transfer.0);
 
         let inst_bytes = as_bytes(inst_data);
 
