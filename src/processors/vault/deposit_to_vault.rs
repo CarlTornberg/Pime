@@ -23,41 +23,30 @@ pub fn process_deposit_to_vault(accounts: &[AccountInfo], instruction_data: &[u8
         return Err(ProgramError::NotEnoughAccountKeys);
     };
 
-    // Safety checks on accounts
-
-    //      from account checks
+    //      Validate account infos
 
     if !from_authority.is_signer() {
         return Err(ProgramError::MissingRequiredSignature);
     }
 
-    //      token program account checks
-
     if !pubkey_eq(token_program.key(), &pinocchio_token::ID) {
         return Err(PimeError::UnsupportedTokenProgram.into());
     } 
 
-    //    Mint 
-    
     if !mint.is_owned_by(token_program.key()) {
         msg!("Mint is now owned by supplied token program.");
         return Err(ProgramError::InvalidAccountOwner);
     }
 
-    //      vault data account checks
-
     let vault_pda = VaultData::get_vault_pda(vault_owner, vault_index, mint.key(), token_program.key());
     if !pubkey_eq(&vault_pda.0, vault.key()) {
-        msg!("Invalid vault");
+        msg!("Incorrect vault PDA");
         return Err(PimeError::IncorrectPDA.into());
     }
-
-    //      vault account checks
-    
     if !vault.is_writable() {
+        msg!("Vault needs to be writeable.");
         return Err(ProgramError::Immutable);
     }
-
     if vault.lamports() == 0 {
         let vault_index_bytes = vault_index.to_le_bytes();
         let vault_bump = &[vault_pda.1];
@@ -76,10 +65,11 @@ pub fn process_deposit_to_vault(accounts: &[AccountInfo], instruction_data: &[u8
         )?;
     } 
     else if !vault.is_owned_by(&pinocchio_token::ID) {
-        msg!("Vault is not owned by the Token Program.");
+        msg!("Vault is not owned by the supplied Token Program.");
         return Err(ProgramError::InvalidAccountOwner);
     }
 
+    //      Business logic
 
     // Token transfer from, to vault
     pinocchio_token::instructions::Transfer {
