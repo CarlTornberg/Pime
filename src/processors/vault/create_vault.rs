@@ -36,20 +36,16 @@ pub fn process_create_vault(accounts: &[AccountInfo], instruction_data: &[u8]) -
         return Err(ProgramError::NotEnoughAccountKeys);
     };
 
-    //    Authority
-    
+    //      Validate account infos
+
     if !authority.is_signer() {
         return Err(ProgramError::MissingRequiredSignature);
     }
 
-    //    Mint 
-    
     if !mint.is_owned_by(token_program.key()) {
         msg!("Mint is now owned by supplied token program.");
         return Err(ProgramError::InvalidAccountOwner);
     }
-
-    //    Vault Data
 
     let vault_data_pda = VaultData::get_vault_data_pda(authority.key(), vault_index, mint.key(), token_program.key());
     if !pubkey_eq(&vault_data_pda.0, vault_data.key()) {
@@ -84,16 +80,13 @@ pub fn process_create_vault(accounts: &[AccountInfo], instruction_data: &[u8]) -
         &Signer::from(&vault_data_signer_seeds),
     )?;
     
-    //   Vault
     let vault_pda = VaultData::get_vault_pda(authority.key(), vault_index, mint.key(), token_program.key());
     if !pubkey_eq(&vault_pda.0, vault.key()) {
         return Err(PimeError::IncorrectPDA.into());
     }
-
     if !vault.is_writable() {
         return Err(ProgramError::Immutable);
     }
-    
     if vault.lamports() == 0 { // If account has not been initialized, init it
         let vault_bump = &[vault_pda.1];
         let vault_seeds = VaultData::get_vault_signer_seeds(
