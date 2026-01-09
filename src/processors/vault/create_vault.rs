@@ -1,5 +1,5 @@
 use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, msg, program_error::ProgramError, pubkey::pubkey_eq, sysvars::clock::UnixTimestamp};
-use crate::{errors::PimeError, processors::shared, states::VaultData};
+use crate::{errors::PimeError, interface::instructions::create_vault_instruction::CreateVaultInstructionData, processors::shared, states::VaultData};
 
 /// Create new vault given a vault index, authority, mint (with corresponding token program), and
 /// settings.
@@ -13,14 +13,11 @@ pub fn process_create_vault(accounts: &[AccountInfo], instruction_data: &[u8]) -
         max_amount, 
         transfer_min_warmup, 
         tranfer_max_window, 
-        ) = if instruction_data.len() >= 
-    size_of::<u64>() + // vault index
-    size_of::<i64>() + // time frame
-    size_of::<u64>() + // max transactions (in the timeframe)
-    size_of::<u64>() + // max amount (in the timeframe)
-    size_of::<UnixTimestamp>() + // transfer min warmup 
-    size_of::<UnixTimestamp>()   // transfer max_window 
-    {
+    ) = if instruction_data.len() < size_of::<CreateVaultInstructionData>() - size_of::<u8>() {
+        msg!("Not enough instruction data. Did you include all fields?");
+        return Err(ProgramError::InvalidInstructionData);
+    }
+    else {
         (
             u64::from_le_bytes(unsafe { *(instruction_data.as_ptr() as *const [u8; size_of::<u64>()]) }),
             i64::from_le_bytes(unsafe { *(instruction_data.as_ptr().add(size_of::<u64>()) as *const [u8; size_of::<u64>()]) }),
@@ -29,10 +26,6 @@ pub fn process_create_vault(accounts: &[AccountInfo], instruction_data: &[u8]) -
             UnixTimestamp::from_le_bytes(unsafe { *(instruction_data.as_ptr().add(size_of::<u64>() * 4) as *const [u8; size_of::<UnixTimestamp>()]) }),
             UnixTimestamp::from_le_bytes(unsafe { *(instruction_data.as_ptr().add(size_of::<u64>() * 5) as *const [u8; size_of::<UnixTimestamp>()]) }),
         )
-    }
-    else {
-        msg!("Not enough instruction data. Did you include all fields?");
-        return Err(ProgramError::InvalidInstructionData);
     };
     if timeframe < 0 {
         msg!("Timeframe must be > 0");
