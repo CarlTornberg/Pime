@@ -108,11 +108,11 @@ When a transaction is booked, the user's assets from the specified vault are mov
 ### Additional features
 * Book a transfer with a warm-up and validity period. (Done)
 * Execute a transfer within its validity period. (Done)
-* Unbook a transfer, refunding the assets back into the vault (WIP)
+* Unbook a transfer, refunding the assets back into the vault (Done)
 
 ## Look into:
 * Magic block - Cheap transactions.
-* LiteSVM - Simpler tests still using rust.
+* LiteSVM - Simpler tests still using rust. (Implemented)
 * Crowdfunding using booked transactions? Stretching its usability maybe..?
 
 ## Comments during iterations
