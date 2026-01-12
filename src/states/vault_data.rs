@@ -1,4 +1,4 @@
-use pinocchio::{instruction::Seed, program_error::ProgramError, pubkey::{Pubkey, find_program_address}, seeds, sysvars::{Sysvar, clock::{Clock, UnixTimestamp}}};
+use pinocchio::{instruction::Seed, msg, program_error::ProgramError, pubkey::{Pubkey, find_program_address}, seeds, sysvars::clock::UnixTimestamp};
 use crate::{errors::PimeError, states::Transmutable};
 
 #[repr(C)]
@@ -168,21 +168,19 @@ impl VaultData {
         let mut history;
 
         // Loop all history
-        for _ in [..max_transactions] {
+        for _ in 0..max_transactions {
             history = unsafe { &*(ptr.add((index * LEN) as usize) as *const VaultHistory) };
 
             // If now is past the history time stamp and vault time frame.
             if history.timestamp() + timeframe < now {
-                if tot_amount.checked_add(amount).ok_or(ProgramError::ArithmeticOverflow)?
-                    > max_amount {
+                if tot_amount.checked_add(amount).ok_or(ProgramError::ArithmeticOverflow)? > max_amount {
+                    msg!("Vault withdraw amount limit reached.");
                     return Err(PimeError::WithdrawLimitReachedAmount.into());
                 }
                 return Ok(VaultHistory::new(now, amount));
             }
             else {
-                tot_amount = tot_amount
-                    .checked_add(history.amount())
-                    .ok_or(ProgramError::ArithmeticOverflow)?; 
+                tot_amount = tot_amount.checked_add(history.amount()).ok_or(ProgramError::ArithmeticOverflow)?; 
 
                 // Get previous timestamp
                 index -= 1;
@@ -191,13 +189,14 @@ impl VaultData {
                 }
             }
         }
+        msg!("Vault withdraw transaction limit reached.");
         Err(PimeError::WithdrawLimitReachedTransactions.into())
     }
 }
 
 #[repr(C)]
 pub struct VaultHistory {
-    timestamp: [u8; size_of::<i64>()],
+    timestamp: [u8; size_of::<UnixTimestamp>()],
     amount: [u8; size_of::<u64>()],
 }
 
@@ -209,15 +208,15 @@ unsafe impl Transmutable for VaultHistory {
 
 impl VaultHistory {
 
-    pub fn new(timestamp: i64, amount: u64) -> Self {
+    pub fn new(timestamp: UnixTimestamp, amount: u64) -> Self {
         Self { timestamp: timestamp.to_le_bytes(), amount: amount.to_le_bytes() }
     }
 
-    pub fn timestamp(&self) -> i64 {
-        i64::from_le_bytes(self.timestamp)
+    pub fn timestamp(&self) -> UnixTimestamp {
+        UnixTimestamp::from_le_bytes(self.timestamp)
     }
 
-    pub fn set_timestamp(&mut self, val: i64) {
+    pub fn set_timestamp(&mut self, val: UnixTimestamp) {
         self.timestamp = val.to_le_bytes();
     }
 

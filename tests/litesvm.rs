@@ -11,7 +11,8 @@ mod litesvm_tests {
     use pime::interface::instructions::unbook_transfer_instruction::UnbookTransferInstructionData;
     use pime::interface::instructions::withdraw_from_vault::WithdrawFromVaultInstructionData;
     use pime::states::transfer_data::TransferData;
-    use pime::states::{VaultData, VaultHistory, as_bytes, from_bytes};
+    use pime::states::{Transmutable, VaultData, VaultHistory, as_bytes, from_bytes};
+    use pinocchio::sysvars::clock::UnixTimestamp;
     use solana_sdk::message::{AccountMeta, Instruction};
     use solana_sdk::pubkey::PUBKEY_BYTES;
     use solana_sdk::{message::Message, native_token::LAMPORTS_PER_SOL, program_pack::Pack, pubkey::Pubkey, signature::Keypair, signer::Signer, transaction::Transaction};
@@ -114,9 +115,9 @@ mod litesvm_tests {
 
         let create_vault_instruction_data = CreateVaultInstructionData::new(
             /* index */ 1u64, 
-            /* timeframe */ 2i64, 
-            /* max_withdraws */ 3u64, 
-            /* max_lamports */ 4u64,
+            /* timeframe */ 0i64, 
+            /* max_withdraws */ 10u64, 
+            /* max_lamports */ 10u64,
             /* transfer min window */ 5u64,
             /* transfer max_window */ 6u64,
         );
@@ -165,7 +166,7 @@ mod litesvm_tests {
             &deposit_inst);
 
         let withdraw_inst = WithdrawFromVaultInstructionData::new(
-            /* amount */ 1, 
+            /* amount */ create_vault_instruction_data.max_amount(), 
             /* vault index */ create_vault_instruction_data.vault_index());
 
         withdraw_from_vault(
@@ -529,8 +530,6 @@ mod litesvm_tests {
             TOKEN_PROGRAM.as_array()
         );
 
-        let max_transactions = inst_data.max_transactions();
-
         let data = as_bytes(inst_data);
 
         let create_vault_inst = Instruction::new_with_bytes(
@@ -557,14 +556,18 @@ mod litesvm_tests {
         };
 
         let vault_data_bytes = svm.get_account(&vault_data.0).unwrap().data;
-        assert_eq!(vault_data_bytes.len(), size_of::<VaultData>() + size_of::<VaultHistory>() * max_transactions as usize);
+        assert_eq!(vault_data_bytes.len(), size_of::<VaultData>() + size_of::<VaultHistory>() * inst_data.max_transactions() as usize);
         // # SAFETY Data bytes are of type Vault
         let vault_acc = from_bytes::<VaultData>(&vault_data_bytes[0.. size_of::<VaultData>()]);
         assert_eq!(vault_acc.unwrap().timeframe(), inst_data.timeframe());
         assert_eq!(vault_acc.unwrap().max_transactions(), inst_data.max_transactions());
         assert_eq!(vault_acc.unwrap().max_amount(), inst_data.max_amount());
-        for d in &vault_data_bytes[size_of::<VaultData>() ..] {
-            assert_eq!(*d, 0); // Check that transaction history bytes are 0'd out.
+
+        for i in 0.. (inst_data.max_transactions() as usize) {
+            let range = VaultData::LEN + i * VaultHistory::LEN;
+            let history = from_bytes::<VaultHistory>(&vault_data_bytes[range .. range + VaultHistory::LEN]).unwrap();
+            assert_eq!(history.timestamp(), UnixTimestamp::MIN);
+            assert_eq!(history.amount(), u64::MIN);
         }
     }
     

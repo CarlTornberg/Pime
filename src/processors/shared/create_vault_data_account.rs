@@ -1,6 +1,6 @@
 use pinocchio::{account_info::AccountInfo, instruction::Signer, program_error::ProgramError, sysvars::clock::UnixTimestamp};
 
-use crate::states::{VaultData, VaultHistory, as_bytes};
+use crate::states::{Transmutable, VaultData, VaultHistory, as_bytes};
 
 pub(crate) fn process_create_vault_data_account(
     authority: &AccountInfo, 
@@ -40,12 +40,16 @@ pub(crate) fn process_create_vault_data_account(
             transfer_max_window,
         )));
 
-    // Zero out the remaining data, which will be vault history.
-    let vault_transactions_mut = unsafe {
-        core::slice::from_raw_parts_mut(
-            vault_data.data_ptr().add(size_of::<VaultData>()), 
-            size_of::<VaultHistory>() * (max_transactions as usize))
-    };
-    for d in vault_transactions_mut { *d = 0; } 
+    let h = VaultHistory::new(UnixTimestamp::MIN, u64::MIN);
+    let fake_history = as_bytes(&h);
+    for i in 0..(max_transactions as usize) {
+        unsafe {
+            core::slice::from_raw_parts_mut(
+                vault_data.data_ptr().add(VaultData::LEN + i * VaultHistory::LEN), 
+                VaultHistory::LEN)
+                .copy_from_slice(fake_history);
+        }
+    }
+
     Ok(())
 }
