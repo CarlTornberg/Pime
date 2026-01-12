@@ -9,7 +9,9 @@ pub struct ExecuteTransferInstructionData {
 
 /// # SAFETY : 
 /// All fields are of u8 and therefore without padding.
-unsafe impl Transmutable for ExecuteTransferInstructionData {}
+unsafe impl Transmutable for ExecuteTransferInstructionData {
+    const LEN: usize = size_of::<Self>();
+}
 
 impl ExecuteTransferInstructionData{
     

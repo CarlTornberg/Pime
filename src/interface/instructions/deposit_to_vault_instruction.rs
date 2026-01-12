@@ -12,7 +12,9 @@ pub struct DepositToVaultInstructionData {
 
 /// # SAFETY : 
 /// All fields are of u8 and therefore without padding.
-unsafe impl Transmutable for DepositToVaultInstructionData {}
+unsafe impl Transmutable for DepositToVaultInstructionData {
+    const LEN: usize = size_of::<Self>();
+}
 
 impl DepositToVaultInstructionData {
     

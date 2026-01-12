@@ -9,7 +9,9 @@ pub use vault_data::*;
 /// Struct must be without padding.
 ///
 /// Tip: Only use u8 and [u8]
-pub unsafe trait Transmutable { }
+pub unsafe trait Transmutable { 
+    const LEN: usize;
+}
 
 /// Convert a T to a byte array
 pub fn as_bytes<T: Transmutable>(data: &T) -> &[u8] {

@@ -44,4 +44,6 @@ impl CreateVaultInstructionData {
 
 /// # SAFETY : 
 /// All fields are of u8 and therefore without padding.
-unsafe impl Transmutable for CreateVaultInstructionData {}
+unsafe impl Transmutable for CreateVaultInstructionData {
+    const LEN: usize = size_of::<Self>();
+}

@@ -12,7 +12,9 @@ pub struct UnbookTransferInstructionData {
 
 /// # SAFETY : 
 /// All fields are of u8 and therefore without padding.
-unsafe impl Transmutable for UnbookTransferInstructionData {}
+unsafe impl Transmutable for UnbookTransferInstructionData {
+    const LEN: usize = size_of::<Self>();
+}
 
 impl UnbookTransferInstructionData {
     pub fn new(vault_index: u64, transfer_index: u64, destination: Pubkey) -> Self{

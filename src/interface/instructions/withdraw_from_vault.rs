@@ -9,7 +9,9 @@ pub struct WithdrawFromVaultInstructionData {
 
 /// # SAFETY : 
 /// All fields are of u8 and therefore without padding.
-unsafe impl Transmutable for WithdrawFromVaultInstructionData {}
+unsafe impl Transmutable for WithdrawFromVaultInstructionData {
+    const LEN: usize = size_of::<Self>();
+}
 
 impl WithdrawFromVaultInstructionData {
     

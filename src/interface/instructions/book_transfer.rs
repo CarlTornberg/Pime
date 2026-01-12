@@ -46,4 +46,6 @@ impl BookTransferInstructionData {
 
 /// # SAFETY : 
 /// All fields are of u8 and therefore without padding.
-unsafe impl Transmutable for BookTransferInstructionData {}
+unsafe impl Transmutable for BookTransferInstructionData {
+    const LEN: usize = size_of::<Self>();
+}
