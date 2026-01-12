@@ -124,4 +124,6 @@ impl TransferData {
 
 /// # SAFETY
 /// Struct does not contain padding.
-unsafe impl Transmutable for TransferData { }
+unsafe impl Transmutable for TransferData {
+    const LEN: usize = size_of::<Self>();
+}
