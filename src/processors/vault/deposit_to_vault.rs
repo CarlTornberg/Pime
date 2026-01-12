@@ -48,6 +48,10 @@ pub fn process_deposit_to_vault(accounts: &[AccountInfo], instruction_data: &[u8
         return Err(ProgramError::Immutable);
     }
     if vault.lamports() == 0 {
+        if !pubkey_eq(token_program.key(), &pinocchio_token::ID) {
+            msg!("Unsupported token program.");
+            return Err(PimeError::UnsupportedTokenProgram.into());
+        }
         let vault_index_bytes = vault_index.to_le_bytes();
         let vault_bump = &[vault_pda.1];
         let vault_signer_seeds = VaultData::get_vault_signer_seeds(

@@ -98,6 +98,10 @@ pub fn process_book_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) 
         msg!("A transfer is already booked.");
         return Err(ProgramError::AccountAlreadyInitialized);
     }
+    if !transfer.is_owned_by(&crate::ID) {
+        msg!("The transfer is not owned by this program.");
+        return Err(ProgramError::IllegalOwner);
+    }
 
     let deposit_pda = TransferData::get_deposit_pda(authority.key(), destination, vault_index, transfer_index, mint.key(), token_program.key());
     if !pubkey_eq(deposit.key(), &deposit_pda.0) {
@@ -107,6 +111,10 @@ pub fn process_book_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) 
     if deposit.lamports() != 0 {
         msg!("The deposit is already in use");
         return Err(ProgramError::AccountAlreadyInitialized);
+    }
+    if !deposit.is_owned_by(token_program.key()) {
+        msg!("The deposit is not owned by the provided token program.");
+        return Err(PimeError::UnsupportedTokenProgram.into());
     }
 
     //      Create transfer account and assign data
