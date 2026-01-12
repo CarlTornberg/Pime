@@ -1,5 +1,5 @@
-use pinocchio::{instruction::Seed, pubkey::{Pubkey, find_program_address}, seeds, sysvars::clock::UnixTimestamp};
-use crate::states::Transmutable;
+use pinocchio::{instruction::Seed, program_error::ProgramError, pubkey::{Pubkey, find_program_address}, seeds, sysvars::{Sysvar, clock::{Clock, UnixTimestamp}}};
+use crate::{errors::PimeError, states::Transmutable};
 
 #[repr(C)]
 pub struct VaultData {
@@ -14,7 +14,10 @@ pub struct VaultData {
     transaction_index: [u8; size_of::<u64>()],
 }
 
-unsafe impl Transmutable for VaultData { }
+unsafe impl Transmutable for VaultData { 
+    const LEN: usize = size_of::<Self>();
+}
+
 
 #[allow(dead_code)]
 impl VaultData {
@@ -154,6 +157,42 @@ impl VaultData {
         &*(vault_bytes.as_ptr() as *const VaultData)
     }
 
+    /// Try to get the next withdraw index in the ptr data.
+    ///
+    /// # SAFETY
+    /// ptr is a valid representation of an array of VaultHistory byte array.
+    pub unsafe fn can_withdraw(ptr: *const u8, now: i64, last_index: u64, amount: u64, max_transactions: u64, max_amount: u64, timeframe: UnixTimestamp) -> Result<VaultHistory, ProgramError> {
+        let mut tot_amount: u64 = 0;
+        let mut index: u64 = last_index;
+        const LEN: u64 = VaultHistory::LEN as u64;
+        let mut history;
+
+        // Loop all history
+        for _ in [..max_transactions] {
+            history = unsafe { &*(ptr.add((index * LEN) as usize) as *const VaultHistory) };
+
+            // If now is past the history time stamp and vault time frame.
+            if history.timestamp() + timeframe < now {
+                if tot_amount.checked_add(amount).ok_or(ProgramError::ArithmeticOverflow)?
+                    > max_amount {
+                    return Err(PimeError::WithdrawLimitReachedAmount.into());
+                }
+                return Ok(VaultHistory::new(now, amount));
+            }
+            else {
+                tot_amount = tot_amount
+                    .checked_add(history.amount())
+                    .ok_or(ProgramError::ArithmeticOverflow)?; 
+
+                // Get previous timestamp
+                index -= 1;
+                if index == 0 {
+                    index = max_transactions - 1;
+                }
+            }
+        }
+        Err(PimeError::WithdrawLimitReachedTransactions.into())
+    }
 }
 
 #[repr(C)]
@@ -164,9 +203,12 @@ pub struct VaultHistory {
 
 /// # SAFETY
 /// Struct does not contain padding.
-unsafe impl Transmutable for VaultHistory { }
+unsafe impl Transmutable for VaultHistory {
+    const LEN: usize = size_of::<Self>();
+}
 
 impl VaultHistory {
+
     pub fn new(timestamp: i64, amount: u64) -> Self {
         Self { timestamp: timestamp.to_le_bytes(), amount: amount.to_le_bytes() }
     }
