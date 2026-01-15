@@ -20,7 +20,7 @@ pub fn unbook_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) -> Pro
     };
 
     // Safety checks on accounts
-    let [authority, vault, transfer, deposit, mint, token_program, _remaining @ ..] = accounts else {
+    let [authority, vault, vault_data, transfer, deposit, mint, token_program, _remaining @ ..] = accounts else {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
 
@@ -39,8 +39,30 @@ pub fn unbook_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) -> Pro
         return Err(ProgramError::UninitializedAccount);
     }
     if !vault.is_owned_by(token_program.key()) {
-        msg!("Vault is not owned by this program.");
+        msg!("Vault is not owned by the supplied token program.");
         return Err(ProgramError::IllegalOwner);
+    }
+    if !vault.is_writable() {
+        msg!("Vault is not writeable.");
+        return Err(ProgramError::Immutable);
+    }
+
+    let vault_data_pda = VaultData::get_vault_data_pda(authority.key(), vault_index, mint.key(), token_program.key());
+    if !pubkey_eq(&vault_data_pda.0, vault_data.key()) {
+        msg!("Vault data PDA incorrect.");
+        return Err(PimeError::IncorrectPDA.into());
+    }
+    if vault_data.lamports() == 0 {
+        msg!("Vault data is not initialized.");
+        return Err(ProgramError::UninitializedAccount);
+    }
+    if !vault_data.is_owned_by(&crate::ID) {
+        msg!("Vault data is not owned by this program.");
+        return Err(ProgramError::IllegalOwner);
+    }
+    if !vault_data.is_writable() {
+        msg!("Vault data is not writeable.");
+        return Err(ProgramError::Immutable);
     }
 
     let transfer_pda = TransferData::get_transfer_pda(
@@ -131,6 +153,11 @@ pub fn unbook_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) -> Pro
         *authority.borrow_mut_lamports_unchecked() += transfer.lamports();
         transfer.close_unchecked();
     }
+
+    // Decrement open transfers from the vault data.
+    // SAFETY: Only mutable here. Vault data bytes are a valid representation of VaultData
+    let vault_data_mut = unsafe { &mut *(vault_data.data_ptr() as *mut VaultData) };
+    vault_data_mut.set_open_transfers(vault_data_mut.open_transfers() - 1);
     
     ProgramResult::Ok(())
 }

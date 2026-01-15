@@ -14,7 +14,7 @@ pub fn execute_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) -> Pr
         u64::from_le_bytes(unsafe {*(instruction_data.as_ptr().add(size_of::<u64>()) as *const [u8; size_of::<u64>()])})
     );
 
-    let [authority, vault, transfer, deposit, destination, mint, token_program, remaining @ ..] = accounts else {
+    let [authority, vault_data, transfer, deposit, destination, mint, token_program, remaining @ ..] = accounts else {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
 
@@ -22,18 +22,22 @@ pub fn execute_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) -> Pr
         return Err(ProgramError::MissingRequiredSignature);
     }
 
-    let vault_pda = VaultData::get_vault_pda(authority.key(), vault_index, mint.key(), token_program.key());
-    if !pubkey_eq(vault.key(), &vault_pda.0) {
-        msg!("Invalid Vauld PDA");
+    let vault_data_pda = VaultData::get_vault_data_pda(authority.key(), vault_index, mint.key(), token_program.key());
+    if !pubkey_eq(vault_data.key(), &vault_data_pda.0) {
+        msg!("Invalid Vault Data PDA");
         return Err(PimeError::IncorrectPDA.into());
     }
-    if vault.lamports() == 0 {
-        msg!("Vault is not initialized");
+    if vault_data.lamports() == 0 {
+        msg!("Vault data is not initialized");
         return Err(ProgramError::UninitializedAccount);
     }
-    if !vault.is_owned_by(token_program.key()) {
-        msg!("Vault has illegal owner.");
+    if !vault_data.is_owned_by(&crate::ID) {
+        msg!("Vault data has illegal owner.");
         return Err(ProgramError::IllegalOwner);
+    }
+    if !vault_data.is_writable() {
+        msg!("Vault data is not mutable.");
+        return Err(ProgramError::Immutable);
     }
 
     let transfer_pda = TransferData::get_transfer_pda(authority.key(), destination.key(), vault_index, transfer_index, mint.key(), token_program.key());
@@ -145,7 +149,7 @@ pub fn execute_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) -> Pr
     //      Close deposit
     pinocchio_token::instructions::CloseAccount {
         account: deposit,
-        destination: vault,
+        destination: authority,
         authority: deposit,
     }.invoke_signed(&[Signer::from(&deposit_signer_seeds)])?;
 
@@ -159,6 +163,11 @@ pub fn execute_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) -> Pr
         *authority.borrow_mut_lamports_unchecked() += transfer.lamports();
         transfer.close_unchecked();
     };
+
+    // Decrement open transfers from the vault data.
+    // SAFETY: Only mutable here. Vault data bytes are a valid representation of VaultData
+    let vault_data_mut = unsafe { &mut *(vault_data.data_ptr() as *mut VaultData) };
+    vault_data_mut.set_open_transfers(vault_data_mut.open_transfers() - 1);
     
     ProgramResult::Ok(())
 }

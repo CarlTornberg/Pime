@@ -2,7 +2,7 @@ use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, m
 use pinocchio_system::instructions::CreateAccount;
 use pinocchio_token::{instructions::Transfer, state::TokenAccount};
 
-use crate::{errors::PimeError, interface::instructions::book_transfer::BookTransferInstructionData, processors::shared::create_deposit_account::create_deposit_account, states::{VaultData, as_bytes, from_bytes, transfer_data::TransferData}};
+use crate::{errors::PimeError, interface::instructions::book_transfer::BookTransferInstructionData, processors::shared::create_deposit_account::create_deposit_account, states::{Transmutable, VaultData, as_bytes, from_bytes, transfer_data::TransferData}};
 
 /// Books a transfer and stores the assets in a temporary vault.
 pub fn process_book_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) -> ProgramResult {
@@ -57,11 +57,15 @@ pub fn process_book_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) 
         msg!("Vault data account is not owned by this program.");
         return Err(ProgramError::IllegalOwner);
     }
+    if !vault_data.is_writable() {
+        msg!("Vault data is not writable.");
+        return Err(ProgramError::Immutable);
+    }
     if vault_data.data_len() < size_of::<VaultData>() {
         msg!("Vault data is of incorrect size.");
         return Err(ProgramError::AccountDataTooSmall);
     }
-    // SAFETY: Vault data is read-only and is of enough bytes. 
+    // SAFETY: Vault data is not borrowed before this. 
     let vault_data_account = 
     unsafe { from_bytes::<VaultData>(&vault_data.borrow_data_unchecked()[..size_of::<VaultData>()]) }?;
     if vault_data_account.transfer_min_warmup() < warmup {
@@ -82,6 +86,10 @@ pub fn process_book_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) 
         msg!("Vault account is not owned by the supplied token program.");
         return Err(ProgramError::IllegalOwner);
     }
+    if !vault.is_writable() {
+        msg!("Vault is not writeable.");
+        return Err(ProgramError::Immutable);
+    }
     if vault.data_len() < TokenAccount::LEN {
         msg!("Vault is not of enough length. Is it really a token account?");
         return Err(ProgramError::AccountDataTooSmall);
@@ -98,6 +106,10 @@ pub fn process_book_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) 
         msg!("A transfer is already booked.");
         return Err(ProgramError::AccountAlreadyInitialized);
     }
+    if !transfer.is_writable() {
+        msg!("Transfer is not writable.");
+        return Err(ProgramError::Immutable);
+    }
 
     let deposit_pda = TransferData::get_deposit_pda(authority.key(), destination, vault_index, transfer_index, mint.key(), token_program.key());
     if !pubkey_eq(deposit.key(), &deposit_pda.0) {
@@ -107,6 +119,10 @@ pub fn process_book_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) 
     if deposit.lamports() != 0 {
         msg!("The deposit is already in use");
         return Err(ProgramError::AccountAlreadyInitialized);
+    }
+    if !deposit.is_writable() {
+        msg!("Deposit is not writable.");
+        return Err(ProgramError::Immutable);
     }
 
     //      Create transfer account and assign data
@@ -176,6 +192,12 @@ pub fn process_book_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) 
         authority: vault,
         amount
     }.invoke_signed(&[Signer::from(&vault_signer_seed)])?;
+
+
+    // Decrement open transfers from the vault data.
+    // SAFETY: Only mutable here. Vault data bytes are a valid representation of VaultData
+    let vault_data_mut = unsafe { &mut *(vault_data.data_ptr() as *mut VaultData) };
+    vault_data_mut.set_open_transfers(vault_data_mut.open_transfers() + 1);
 
     ProgramResult::Ok(())
 }

@@ -558,10 +558,11 @@ mod litesvm_tests {
         let vault_data_bytes = svm.get_account(&vault_data.0).unwrap().data;
         assert_eq!(vault_data_bytes.len(), size_of::<VaultData>() + size_of::<VaultHistory>() * inst_data.max_transactions() as usize);
         // # SAFETY Data bytes are of type Vault
-        let vault_acc = from_bytes::<VaultData>(&vault_data_bytes[0.. size_of::<VaultData>()]);
-        assert_eq!(vault_acc.unwrap().timeframe(), inst_data.timeframe());
-        assert_eq!(vault_acc.unwrap().max_transactions(), inst_data.max_transactions());
-        assert_eq!(vault_acc.unwrap().max_amount(), inst_data.max_amount());
+        let vault_acc = from_bytes::<VaultData>(&vault_data_bytes[0.. size_of::<VaultData>()]).unwrap();
+        assert_eq!(vault_acc.timeframe(), inst_data.timeframe());
+        assert_eq!(vault_acc.max_transactions(), inst_data.max_transactions());
+        assert_eq!(vault_acc.max_amount(), inst_data.max_amount());
+        assert_eq!(vault_acc.open_transfers(), 0);
 
         for i in 0.. (inst_data.max_transactions() as usize) {
             let range = VaultData::LEN + i * VaultHistory::LEN;
@@ -700,6 +701,11 @@ mod litesvm_tests {
             TOKEN_PROGRAM.as_array()
         );
 
+        let vault_data_open_transfers_pre = if let Some(a) = &svm.get_account(&vault_data.0) {
+            from_bytes::<VaultData>(&a.data[..VaultData::LEN]).unwrap().open_transfers()
+        }
+        else { 0 };
+
         let vault_acc_pre_val = if let Some(a) = &svm.get_account(&vault.0) {
             TokenAccount::unpack(&a.data).unwrap().amount
         }
@@ -749,12 +755,19 @@ mod litesvm_tests {
 
         // Check that the tokens has been sent to the deposit account.
         assert_eq!(deposit_acc.amount, deposit_acc_pre_val + inst_data.amount());
+
+        // Verify that Vault data incremented the newly added transfer
+        if let Some(a) = svm.get_account(&vault_data.0) {
+            assert_eq!(
+            from_bytes::<VaultData>(&a.data[..VaultData::LEN]).unwrap().open_transfers(),
+            vault_data_open_transfers_pre + 1);
+        }
     }
 
     fn execute_transfer(svm: &mut LiteSVM, inst_data: &ExecuteTransferInstructionData, authority: &Keypair, destination: &Pubkey, destination_owner: &Pubkey, mint: &Pubkey, token_program: &Pubkey) {
         let inst_bytes = as_bytes(inst_data);
 
-        let vault = find_vault_pda(
+        let vault_data = find_vault_data_pda(
             inst_data.vault_index(), 
             authority.pubkey().as_array(), 
             mint.as_array(),
@@ -780,15 +793,12 @@ mod litesvm_tests {
         let deposit_acc_pre_val = if let Some(a) = &svm.get_account(&deposit.0) {
             TokenAccount::unpack(&a.data).unwrap().amount
         }
-        else {
-            0
-        };
+        else { 0 };
         let destination_acc_pre_val = if let Some(a) = &svm.get_account(destination) {
             TokenAccount::unpack(&a.data).unwrap().amount
         }
-        else {
-            0
-        };
+        else { 0 };
+        let pre_open_transfers = from_bytes::<VaultData>(&svm.get_account(&vault_data.0).unwrap().data[..VaultData::LEN]).unwrap().open_transfers();
         let tda = svm.get_account(&transfer.0).unwrap();
         let transfer_acc = from_bytes::<TransferData>(&tda.data).unwrap();
         let transfer_amount = transfer_acc.amount();
@@ -798,7 +808,7 @@ mod litesvm_tests {
             inst_bytes, 
             [
                 AccountMeta::new(authority.pubkey(), true),
-                AccountMeta::new(vault.0, false),
+                AccountMeta::new(vault_data.0, false),
                 AccountMeta::new(transfer.0, false),
                 AccountMeta::new(deposit.0, false),
                 AccountMeta::new(*destination, false),
@@ -833,11 +843,20 @@ mod litesvm_tests {
         if let Some(a) = svm.get_account(&transfer.0) {
             assert_eq!(a.lamports, 0);
         }
+
+        let post_open_transfers = from_bytes::<VaultData>(&svm.get_account(&vault_data.0).unwrap().data[..VaultData::LEN]).unwrap().open_transfers();
+        assert_eq!(post_open_transfers, pre_open_transfers - 1);
     }
 
     fn unbook_transfer(svm: &mut LiteSVM, inst_data: &UnbookTransferInstructionData, authority: &Keypair, mint: &Pubkey, token_program: &Pubkey) {
         
         let vault = find_vault_pda(
+            inst_data.vault_index(), 
+            authority.pubkey().as_array(), 
+            mint.as_array(),
+            TOKEN_PROGRAM.as_array()
+        );
+        let vault_data = find_vault_data_pda(
             inst_data.vault_index(), 
             authority.pubkey().as_array(), 
             mint.as_array(),
@@ -868,6 +887,7 @@ mod litesvm_tests {
             [
                 AccountMeta::new(authority.pubkey(), true),
                 AccountMeta::new(vault.0, false),
+                AccountMeta::new(vault_data.0, false),
                 AccountMeta::new(transfer.0, false),
                 AccountMeta::new(deposit.0, false),
                 AccountMeta::new_readonly(*mint, false),

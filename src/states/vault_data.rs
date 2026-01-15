@@ -11,6 +11,7 @@ pub struct VaultData {
     max_transactions: [u8; size_of::<u64>()],
     transfer_min_warmup: [u8; size_of::<UnixTimestamp>()],
     transfer_max_window: [u8; size_of::<UnixTimestamp>()],
+    open_transfers: [u8; size_of::<u64>()],
     transaction_index: [u8; size_of::<u64>()],
 }
 
@@ -35,6 +36,7 @@ impl VaultData {
             max_transactions: max_transactions.to_le_bytes(),
             transfer_min_warmup: transfer_min_warmup.to_le_bytes(),
             transfer_max_window: transfer_max_window.to_le_bytes(),
+            open_transfers: 0u64.to_le_bytes(),
             transaction_index: 0u64.to_le_bytes()
         }
     }
@@ -93,6 +95,14 @@ impl VaultData {
 
     pub fn set_transfer_max_window(&mut self, val: &UnixTimestamp) {
         self.transfer_max_window = val.to_le_bytes();
+    }
+
+    pub fn open_transfers(&self) -> u64 {
+        u64::from_le_bytes(self.open_transfers)
+    }
+
+    pub fn set_open_transfers(&mut self, val: u64) {
+        self.open_transfers = val.to_le_bytes();
     }
 
     /// Calculates the vault data PDA with bump.
