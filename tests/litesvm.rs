@@ -5,6 +5,7 @@ mod litesvm_tests {
 
     use litesvm::LiteSVM;
     use pime::interface::instructions::book_transfer::BookTransferInstructionData;
+    use pime::interface::instructions::close_vault_instruction::CloseVaultInstructionData;
     use pime::interface::instructions::create_vault_instruction::CreateVaultInstructionData;
     use pime::interface::instructions::deposit_to_vault_instruction::DepositToVaultInstructionData;
     use pime::interface::instructions::execute_transfer::ExecuteTransferInstructionData;
@@ -46,6 +47,33 @@ mod litesvm_tests {
         // Create vault based on the new mint
         create_new_vault(&mut svm, &alice, &create_vault_instruction_data, &mint.pubkey());
 
+    }
+
+    #[test]
+    fn alice_closes_own_vault() {
+        let mut svm = create_svm();
+        let alice = Keypair::new();
+        svm.airdrop(&alice.pubkey(), LAMPORTS_PER_SOL).unwrap();
+
+        let create_vault_instruction_data = CreateVaultInstructionData::new(
+            /* index */ 0u64, 
+            /* timeframe */ 1i64, 
+            /* max_withdraws */ 2u64, 
+            /* max_lamports */ 3u64,
+            /* transfer min window */ 4u64,
+            /* transfer max_window */ 5u64,
+        );
+
+        // Create new mint
+        let mint = Keypair::new();
+        initialize_mint(&mut svm, &alice.pubkey(), &mint, &alice);
+
+        // Create vault based on the new mint
+        create_new_vault(&mut svm, &alice, &create_vault_instruction_data, &mint.pubkey());
+
+        let close_inst = CloseVaultInstructionData::new(create_vault_instruction_data.vault_index());
+
+        close_vault(&mut svm, &close_inst, &alice, &mint.pubkey(), &TOKEN_PROGRAM);
     }
 
     #[test]
@@ -667,6 +695,50 @@ mod litesvm_tests {
 
         assert_eq!(to_pre_amount + inst_data.amount(), to_ata_account.amount);
         assert_eq!(vault_account.amount, vault_pre_amount - inst_data.amount());
+    }
+
+    fn close_vault(svm: &mut LiteSVM, inst_data: &CloseVaultInstructionData, authority: &Keypair, mint: &Pubkey, token_program: &Pubkey) {
+        let inst_bytes = as_bytes(inst_data);
+
+        let vault_data = find_vault_data_pda(
+            inst_data.vault_index(), 
+            authority.pubkey().as_array(), 
+            mint.as_array(),
+            TOKEN_PROGRAM.as_array()
+        );
+        let vault = find_vault_pda(
+            inst_data.vault_index(), 
+            authority.pubkey().as_array(), 
+            mint.as_array(),
+            TOKEN_PROGRAM.as_array()
+        );
+
+        let inst = Instruction::new_with_bytes(
+            PIME_ID, 
+            inst_bytes, 
+            [
+                AccountMeta::new(authority.pubkey(), true),
+                AccountMeta::new(vault.0, false),
+                AccountMeta::new(vault_data.0, false),
+                AccountMeta::new_readonly(*mint, false),
+                AccountMeta::new_readonly(*token_program, false)
+            ].to_vec());
+
+        let tx = Transaction::new(
+            &[authority], 
+            Message::new(
+                &[inst], 
+                Some(&authority.pubkey())
+            ), 
+            svm.latest_blockhash()
+        );
+
+        if let Err(e) = svm.send_transaction(tx) {
+            panic!("Failed to close vault: {:#?}", e);
+        }
+
+        assert_eq!(svm.get_account(&vault.0), None);
+        assert_eq!(svm.get_account(&vault_data.0), None);
     }
 
     fn book_transfer(svm: &mut LiteSVM, inst_data: &BookTransferInstructionData, authority: &Keypair, mint: &Pubkey, token_program: &Pubkey ) {

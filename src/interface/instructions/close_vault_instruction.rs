@@ -10,7 +10,7 @@ impl CloseVaultInstructionData {
     
     pub fn new(vault_index: u64) -> Self {
         Self { 
-            discriminator: PimeInstruction::CreateVault as u8, 
+            discriminator: PimeInstruction::CloseVault as u8, 
             vault_index: vault_index.to_le_bytes(), 
         }
     }
