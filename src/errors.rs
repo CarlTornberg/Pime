@@ -15,6 +15,8 @@ pub enum PimeError {
     DestinationMismatch,
     TransferWarmingUp,
     TransferExpired,
+    VaultHasOpenTransfers,
+    VaultIsNotEmpty,
 
 
 
