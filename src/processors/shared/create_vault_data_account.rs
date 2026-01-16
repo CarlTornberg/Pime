@@ -8,6 +8,7 @@ pub(crate) fn process_create_vault_data_account(
     max_transactions: u64, 
     timeframe: i64, 
     max_lamports: u64, 
+    allows_transfers: u8,
     transfer_min_warmup: UnixTimestamp,
     transfer_max_window: UnixTimestamp,
     vault_data_signer: &Signer) -> Result<(), ProgramError> {
@@ -36,6 +37,7 @@ pub(crate) fn process_create_vault_data_account(
             timeframe, 
             max_lamports, 
             max_transactions,
+            allows_transfers,
             transfer_min_warmup,
             transfer_max_window,
         )));

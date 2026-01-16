@@ -9,6 +9,7 @@ pub struct VaultData {
     timeframe: [u8; size_of::<UnixTimestamp>()],
     max_amount: [u8; size_of::<u64>()],
     max_transactions: [u8; size_of::<u64>()],
+    allows_transfers: u8,
     transfer_min_warmup: [u8; size_of::<UnixTimestamp>()],
     transfer_max_window: [u8; size_of::<UnixTimestamp>()],
     open_transfers: [u8; size_of::<u64>()],
@@ -19,14 +20,21 @@ unsafe impl Transmutable for VaultData {
     const LEN: usize = size_of::<Self>();
 }
 
-
 #[allow(dead_code)]
 impl VaultData {
     pub const VAULT_SEED: &[u8] = b"vault";
     pub const VAULT_DATA_SEED: &[u8] = b"vault_data";
     pub const VAULT_STAKE_SEED: &[u8] = b"vault_stake";
 
-    pub fn new(authority: Pubkey, timeframe: i64, max_amount: u64, max_transactions: u64, transfer_min_warmup: UnixTimestamp, transfer_max_window: UnixTimestamp) -> Self {
+    pub fn new(
+        authority: Pubkey, 
+        timeframe: i64, 
+        max_amount: u64, 
+        max_transactions: u64, 
+        allows_transfers: u8, 
+        transfer_min_warmup: UnixTimestamp, 
+        transfer_max_window: UnixTimestamp
+    ) -> Self {
         Self { 
             discriminator: 0u8, 
             version: 1u64.to_le_bytes(), 
@@ -36,6 +44,7 @@ impl VaultData {
             max_transactions: max_transactions.to_le_bytes(),
             transfer_min_warmup: transfer_min_warmup.to_le_bytes(),
             transfer_max_window: transfer_max_window.to_le_bytes(),
+            allows_transfers,
             open_transfers: 0u64.to_le_bytes(),
             transaction_index: 0u64.to_le_bytes()
         }
@@ -95,6 +104,10 @@ impl VaultData {
 
     pub fn set_transfer_max_window(&mut self, val: &UnixTimestamp) {
         self.transfer_max_window = val.to_le_bytes();
+    }
+
+    pub fn allows_transfers(&self) -> bool {
+        self.allows_transfers != 0
     }
 
     pub fn open_transfers(&self) -> u64 {

@@ -11,6 +11,7 @@ pub fn process_create_vault(accounts: &[AccountInfo], instruction_data: &[u8]) -
         timeframe, 
         max_transactions, 
         max_amount, 
+        allows_transfers,
         transfer_min_warmup, 
         tranfer_max_window, 
     ) = if instruction_data.len() < size_of::<CreateVaultInstructionData>() - size_of::<u8>() {
@@ -23,8 +24,9 @@ pub fn process_create_vault(accounts: &[AccountInfo], instruction_data: &[u8]) -
             i64::from_le_bytes(unsafe { *(instruction_data.as_ptr().add(size_of::<u64>()) as *const [u8; size_of::<u64>()]) }),
             u64::from_le_bytes(unsafe { *(instruction_data.as_ptr().add(size_of::<u64>() * 2) as *const [u8; size_of::<u64>()]) }),
             u64::from_le_bytes(unsafe { *(instruction_data.as_ptr().add(size_of::<u64>() * 3) as *const [u8; size_of::<u64>()]) }),
-            UnixTimestamp::from_le_bytes(unsafe { *(instruction_data.as_ptr().add(size_of::<u64>() * 4) as *const [u8; size_of::<UnixTimestamp>()]) }),
-            UnixTimestamp::from_le_bytes(unsafe { *(instruction_data.as_ptr().add(size_of::<u64>() * 5) as *const [u8; size_of::<UnixTimestamp>()]) }),
+            unsafe { &*(instruction_data.as_ptr().add(size_of::<u64>() * 3 + size_of::<u8>()) as *const u8) },
+            UnixTimestamp::from_le_bytes(unsafe { *(instruction_data.as_ptr().add(size_of::<u64>() * 4 + size_of::<u8>()) as *const [u8; size_of::<UnixTimestamp>()]) }),
+            UnixTimestamp::from_le_bytes(unsafe { *(instruction_data.as_ptr().add(size_of::<u64>() * 5 + size_of::<u8>()) as *const [u8; size_of::<UnixTimestamp>()]) }),
         )
     };
     if timeframe < 0 {
@@ -75,6 +77,7 @@ pub fn process_create_vault(accounts: &[AccountInfo], instruction_data: &[u8]) -
         max_transactions,
         timeframe,
         max_amount,
+        *allows_transfers,
         transfer_min_warmup,
         tranfer_max_window,
         &Signer::from(&vault_data_signer_seeds),
