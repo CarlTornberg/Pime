@@ -1,6 +1,6 @@
 mod vault_data;
 pub mod transfer_data;
-use pinocchio::program_error::ProgramError;
+use pinocchio::error::ProgramError;
 pub use vault_data::*;
 
 /// Trait can be converted from instruction data byte array.

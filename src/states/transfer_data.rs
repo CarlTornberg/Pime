@@ -1,4 +1,17 @@
-use pinocchio::{instruction::Seed, program_error::ProgramError, pubkey::{Pubkey, find_program_address}, seeds, sysvars::{Sysvar, clock::{Clock, Epoch, UnixTimestamp}}};
+use pinocchio::{
+    Address, 
+    cpi::Seed, 
+    error::ProgramError, 
+    instruction::seeds, 
+    sysvars::{
+        Sysvar, 
+        clock::{
+            Clock, 
+            Epoch, 
+            UnixTimestamp
+        }
+    }
+};
 
 use crate::states::Transmutable;
 
@@ -6,8 +19,8 @@ use crate::states::Transmutable;
 pub struct TransferData {
     pub discriminator: u8,
     version: [u8; size_of::<u64>()],
-    pub vault_data: Pubkey,
-    pub destination: Pubkey,
+    pub vault_data: Address,
+    pub destination: Address,
     amount: [u8; size_of::<UnixTimestamp>()],
     created: [u8; size_of::<UnixTimestamp>()],
     created_epoch: [u8; size_of::<Epoch>()],
@@ -19,7 +32,7 @@ impl TransferData {
     pub const TRANSFER_SEED: &[u8] = b"transfer";
     pub const DEPOSIT_SEED: &[u8] = b"deposit";
 
-    pub fn new(vault_data: Pubkey, amount: u64, destination: Pubkey, warmup: UnixTimestamp, validity: UnixTimestamp) -> Result<Self, ProgramError> {
+    pub fn new(vault_data: Address, amount: u64, destination: Address, warmup: UnixTimestamp, validity: UnixTimestamp) -> Result<Self, ProgramError> {
         let clock = Clock::get()?;
         Ok(Self { discriminator: 10u8, 
             version: 0u64.to_le_bytes(),
@@ -55,68 +68,68 @@ impl TransferData {
 
     // Get the transfer's PDA.
     // Derived from the vault_data
-    pub fn get_transfer_pda(authority: &Pubkey, destination: &Pubkey, vault_index: u64, transfer_index: u64, mint: &Pubkey, token_program: &Pubkey) -> (Pubkey, u8) {
+    pub fn find_transfer_address(authority: &Address, destination: &Address, vault_index: u64, transfer_index: u64, mint: &Address, token_program: &Address) -> (Address, u8) {
         let seeds: &[&[u8]] = &[
             Self::TRANSFER_SEED,
             &vault_index.to_le_bytes(),
             &transfer_index.to_le_bytes(),
-            authority,
-            destination,
-            mint,
-            token_program,
+            authority.as_array(),
+            destination.as_array(),
+            mint.as_array(),
+            token_program.as_array(),
         ];
-        find_program_address(seeds, &crate::ID)
+        Address::find_program_address(seeds, &crate::ADDRESS)
     }
-    pub fn get_transfer_signer_seeds<'a>(
-        authority: &'a Pubkey, 
-        destination: &'a Pubkey, 
+    pub fn transfer_signer_seeds<'a>(
+        authority: &'a Address, 
+        destination: &'a Address, 
         vault_index: &'a [u8; size_of::<u64>()], 
         transfer_index: &'a [u8; size_of::<u64>()], 
-        mint: &'a Pubkey, 
-        token_program: &'a Pubkey, 
+        mint: &'a Address, 
+        token_program: &'a Address, 
         bump: &'a [u8]) -> [Seed<'a>; 8] {
         seeds!(
             Self::TRANSFER_SEED,
             vault_index,
             transfer_index,
-            authority,
-            destination,
-            mint,
-            token_program,
+            authority.as_array(),
+            destination.as_array(),
+            mint.as_array(),
+            token_program.as_array(),
             bump
         )
     }
 
     // Get the transfer's PDA.
     // Derived from the vault_data
-    pub fn get_deposit_pda(authority: &Pubkey, destination: &Pubkey, vault_index: u64, transfer_index: u64, mint: &Pubkey, token_program: &Pubkey) -> (Pubkey, u8) {
+    pub fn find_deposit_address(authority: &Address, destination: &Address, vault_index: u64, transfer_index: u64, mint: &Address, token_program: &Address) -> (Address, u8) {
         let seeds: &[&[u8]] = &[
             Self::DEPOSIT_SEED,
             &vault_index.to_le_bytes(),
             &transfer_index.to_le_bytes(),
-            authority,
-            destination,
-            mint,
-            token_program,
+            authority.as_array(),
+            destination.as_array(),
+            mint.as_array(),
+            token_program.as_array(),
         ];
-        find_program_address(seeds, &crate::ID)
+        Address::find_program_address(seeds, &crate::ADDRESS)
     }
-    pub fn get_deposit_signer_seeds<'a>(
-        authority: &'a Pubkey, 
-        destination: &'a Pubkey, 
+    pub fn deposit_signer_seeds<'a>(
+        authority: &'a Address, 
+        destination: &'a Address, 
         vault_index: &'a [u8; size_of::<u64>()], 
         transfer_index: &'a [u8; size_of::<u64>()], 
-        mint: &'a Pubkey, 
-        token_program: &'a Pubkey, 
+        mint: &'a Address, 
+        token_program: &'a Address, 
         bump: &'a [u8]) -> [Seed<'a>; 8] {
         seeds!(
             Self::DEPOSIT_SEED,
             vault_index,
             transfer_index,
-            authority,
-            destination,
-            mint,
-            token_program,
+            authority.as_array(),
+            destination.as_array(),
+            mint.as_array(),
+            token_program.as_array(),
             bump
         )
     }

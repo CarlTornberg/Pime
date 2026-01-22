@@ -1,4 +1,4 @@
-use pinocchio::program_error::ProgramError;
+use pinocchio::error::ProgramError;
 
 
 #[repr(u8)]
@@ -146,7 +146,7 @@ impl TryFrom<u8> for PimeInstruction {
     type Error = ProgramError;
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value { 
-            0..=6 => Ok(unsafe { core::mem::transmute::<u8, PimeInstruction>(value) }),
+            0..=12 => Ok(unsafe { core::mem::transmute::<u8, PimeInstruction>(value) }),
             _ => Err(ProgramError::InvalidInstructionData)
         }
     }

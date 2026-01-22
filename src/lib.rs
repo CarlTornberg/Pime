@@ -1,8 +1,16 @@
 #![no_std]
-
 use pinocchio::{
-  ProgramResult, account_info::AccountInfo, default_allocator, hint::unlikely, msg, nostd_panic_handler, program_entrypoint, program_error::ProgramError, pubkey::{Pubkey, pubkey_eq}
+    AccountView, 
+    Address, 
+    ProgramResult, 
+    address::address_eq, 
+    default_allocator, 
+    error::ProgramError, 
+    hint::unlikely, 
+    nostd_panic_handler, 
+    program_entrypoint 
 };
+use pinocchio_log::log;
 use pinocchio_pubkey::declare_id;
 
 pub mod interface;
@@ -14,13 +22,14 @@ program_entrypoint!(process_instruction);
 default_allocator!();
 nostd_panic_handler!();
 declare_id!("FXvAaHn9TQfDrWZV5X47zYB1r8vcwMPpnDCuTeSafEXw");
+const ADDRESS: Address = Address::new_from_array(crate::ID);
 
 pub fn process_instruction(
-  program_id: &Pubkey,
-  accounts: &[AccountInfo],
+  program_id: &Address,
+  accounts: &[AccountView],
   instruction_data: &[u8],
 ) -> ProgramResult {
-    if unlikely(!pubkey_eq(program_id, &ID)) {
+    if unlikely(!address_eq(program_id, &crate::ADDRESS)) {
         return Err(ProgramError::IncorrectProgramId);
     }
 
@@ -30,35 +39,35 @@ pub fn process_instruction(
 
     match *inst {
         0 => {
-            msg!("Create vault");
+            log!("Create vault");
             processors::create_vault::process_create_vault(accounts, data)?
         },
         1 => {
-            msg!("Deposit");
+            log!("Deposit");
             processors::deposit_to_vault::process_deposit_to_vault(accounts, data)?
         },
         2 => {
-            msg!("Withdraw");
+            log!("Withdraw");
             processors::withdraw_from_vault::process_withdraw_from_vault(accounts, data)?
         },
         3 => {
-            msg!("Close");
+            log!("Close");
             processors::close_vault::process_close_vault(accounts, data)?
         },
         10 => {
-            msg!("Book transfer");
+            log!("Book transfer");
             processors::transfer::book_transfer::process_book_transfer(accounts, data)?
         },
-       11 => {
-            msg!("Execute transfer");
+        11 => {
+            log!("Execute transfer");
             processors::transfer::execute_transfer::execute_transfer(accounts, data)?
         },
-       12 => {
-            msg!("Unbook transfer");
+        12 => {
+            log!("Unbook transfer");
             processors::transfer::unbook_transfer::unbook_transfer(accounts, data)?
         },
         _ => {return Err(ProgramError::InvalidInstructionData);}
-        
+
     }
 
   Ok(())

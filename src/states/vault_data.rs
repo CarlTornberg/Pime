@@ -1,11 +1,12 @@
-use pinocchio::{instruction::Seed, msg, program_error::ProgramError, pubkey::{Pubkey, find_program_address}, seeds, sysvars::clock::UnixTimestamp};
+use pinocchio::{
+    Address, cpi::Seed, error::ProgramError, instruction::seeds, sysvars::clock::UnixTimestamp};
 use crate::{errors::PimeError, states::Transmutable};
 
 #[repr(C)]
 pub struct VaultData {
     pub(crate) discriminator: u8,
     version: [u8; size_of::<u64>()],
-    pub(crate) authority: Pubkey,
+    pub(crate) authority: Address,
     timeframe: [u8; size_of::<UnixTimestamp>()],
     max_amount: [u8; size_of::<u64>()],
     max_transactions: [u8; size_of::<u64>()],
@@ -27,7 +28,7 @@ impl VaultData {
     pub const VAULT_STAKE_SEED: &[u8] = b"vault_stake";
 
     pub fn new(
-        authority: Pubkey, 
+        authority: Address, 
         timeframe: i64, 
         max_amount: u64, 
         max_transactions: u64, 
@@ -124,23 +125,23 @@ impl VaultData {
     ///
     /// Index allows an author to have multiple vaults for a specific token
     /// This enabled additional fine grained control over an asset.
-    pub fn get_vault_data_pda(authority: &Pubkey, index: u64, mint: &Pubkey, token_program: &Pubkey) -> (Pubkey, u8) {
+    pub fn vault_data_address(authority: &Address, index: u64, mint: &Address, token_program: &Address) -> (Address, u8) {
         let seeds: &[&[u8]] = &[
             VaultData::VAULT_DATA_SEED,
             &index.to_le_bytes(),
-            authority,
-            mint,
-            token_program,
+            authority.as_array(),
+            mint.as_array(),
+            token_program.as_array(),
         ];
-        find_program_address(seeds, &crate::ID)
+        Address::find_program_address(seeds, &crate::ADDRESS)
     }
-    pub fn get_vault_data_signer_seeds<'a>(authority: &'a Pubkey, vault_index: &'a [u8; size_of::<u64>()], mint: &'a Pubkey, token_program: &'a Pubkey, bump: &'a [u8]) -> [Seed<'a>; 6] {
+    pub fn get_vault_data_signer_seeds<'a>(authority: &'a Address, vault_index: &'a [u8; size_of::<u64>()], mint: &'a Address, token_program: &'a Address, bump: &'a [u8]) -> [Seed<'a>; 6] {
         seeds!(
             VaultData::VAULT_DATA_SEED,
             vault_index,
-            authority,
-            mint,
-            token_program,
+            authority.as_array(),
+            mint.as_array(),
+            token_program.as_array(),
             bump
         )
     }
