@@ -78,7 +78,7 @@ impl TransferData {
             mint.as_array(),
             token_program.as_array(),
         ];
-        Address::find_program_address(seeds, &crate::ADDRESS)
+        Address::find_program_address(seeds, &crate::ID)
     }
     pub fn transfer_signer_seeds<'a>(
         authority: &'a Address, 
@@ -112,7 +112,7 @@ impl TransferData {
             mint.as_array(),
             token_program.as_array(),
         ];
-        Address::find_program_address(seeds, &crate::ADDRESS)
+        Address::find_program_address(seeds, &crate::ID)
     }
     pub fn deposit_signer_seeds<'a>(
         authority: &'a Address, 

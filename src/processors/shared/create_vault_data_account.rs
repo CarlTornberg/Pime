@@ -1,10 +1,10 @@
-use pinocchio::{account_info::AccountInfo, instruction::Signer, program_error::ProgramError, sysvars::clock::UnixTimestamp};
+use pinocchio::{AccountView, cpi::Signer, error::ProgramError, sysvars::clock::UnixTimestamp};
 
 use crate::states::{Transmutable, VaultData, VaultHistory, as_bytes};
 
 pub(crate) fn process_create_vault_data_account(
-    authority: &AccountInfo, 
-    vault_data: &AccountInfo, 
+    authority: &AccountView, 
+    vault_data: &AccountView, 
     max_transactions: u64, 
     timeframe: i64, 
     max_lamports: u64, 
@@ -33,7 +33,7 @@ pub(crate) fn process_create_vault_data_account(
     };
     vault_data_mut.copy_from_slice(as_bytes(
         &VaultData::new(
-            *authority.key(), 
+            authority.address().clone(), 
             timeframe, 
             max_lamports, 
             max_transactions,
@@ -55,5 +55,3 @@ pub(crate) fn process_create_vault_data_account(
 
     Ok(())
 }
-
-    ASD

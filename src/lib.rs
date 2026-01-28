@@ -3,15 +3,14 @@ use pinocchio::{
     AccountView, 
     Address, 
     ProgramResult, 
-    address::address_eq, 
+    address::{address_eq, declare_id}, 
     default_allocator, 
     error::ProgramError, 
     hint::unlikely, 
     nostd_panic_handler, 
     program_entrypoint 
 };
-use pinocchio_log::log;
-use pinocchio_pubkey::declare_id;
+use solana_program_log::log;
 
 pub mod interface;
 mod processors;
@@ -22,14 +21,13 @@ program_entrypoint!(process_instruction);
 default_allocator!();
 nostd_panic_handler!();
 declare_id!("FXvAaHn9TQfDrWZV5X47zYB1r8vcwMPpnDCuTeSafEXw");
-const ADDRESS: Address = Address::new_from_array(crate::ID);
 
 pub fn process_instruction(
   program_id: &Address,
   accounts: &[AccountView],
   instruction_data: &[u8],
 ) -> ProgramResult {
-    if unlikely(!address_eq(program_id, &crate::ADDRESS)) {
+    if unlikely(!address_eq(program_id, &crate::ID)) {
         return Err(ProgramError::IncorrectProgramId);
     }
 

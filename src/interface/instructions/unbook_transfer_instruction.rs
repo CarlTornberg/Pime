@@ -1,4 +1,4 @@
-use pinocchio::pubkey::Pubkey;
+use pinocchio::Address;
 
 use crate::{interface::pime_instruction::PimeInstruction, states::Transmutable};
 
@@ -7,7 +7,7 @@ pub struct UnbookTransferInstructionData {
     pub discriminator: u8,
     vault_index: [u8; size_of::<u64>()],
     transfer_index: [u8; size_of::<u64>()],
-    pub destination: Pubkey,
+    pub destination: Address,
 }
 
 /// # SAFETY : 
@@ -17,7 +17,7 @@ unsafe impl Transmutable for UnbookTransferInstructionData {
 }
 
 impl UnbookTransferInstructionData {
-    pub fn new(vault_index: u64, transfer_index: u64, destination: Pubkey) -> Self{
+    pub fn new(vault_index: u64, transfer_index: u64, destination: Address) -> Self{
         Self { 
             discriminator: PimeInstruction::UnbookTransfer as u8, 
             vault_index: vault_index.to_le_bytes(), 

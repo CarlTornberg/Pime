@@ -1,5 +1,6 @@
 use pinocchio::{
     Address, cpi::Seed, error::ProgramError, instruction::seeds, sysvars::clock::UnixTimestamp};
+use solana_program_log::log;
 use crate::{errors::PimeError, states::Transmutable};
 
 #[repr(C)]
@@ -125,7 +126,7 @@ impl VaultData {
     ///
     /// Index allows an author to have multiple vaults for a specific token
     /// This enabled additional fine grained control over an asset.
-    pub fn vault_data_address(authority: &Address, index: u64, mint: &Address, token_program: &Address) -> (Address, u8) {
+    pub fn find_vault_data_address(authority: &Address, index: u64, mint: &Address, token_program: &Address) -> (Address, u8) {
         let seeds: &[&[u8]] = &[
             VaultData::VAULT_DATA_SEED,
             &index.to_le_bytes(),
@@ -133,9 +134,9 @@ impl VaultData {
             mint.as_array(),
             token_program.as_array(),
         ];
-        Address::find_program_address(seeds, &crate::ADDRESS)
+        Address::find_program_address(seeds, &crate::ID)
     }
-    pub fn get_vault_data_signer_seeds<'a>(authority: &'a Address, vault_index: &'a [u8; size_of::<u64>()], mint: &'a Address, token_program: &'a Address, bump: &'a [u8]) -> [Seed<'a>; 6] {
+    pub fn vault_data_signer_seeds<'a>(authority: &'a Address, vault_index: &'a [u8; size_of::<u64>()], mint: &'a Address, token_program: &'a Address, bump: &'a [u8]) -> [Seed<'a>; 6] {
         seeds!(
             VaultData::VAULT_DATA_SEED,
             vault_index,
@@ -147,23 +148,23 @@ impl VaultData {
     }
     
     /// Get the Vault PDA
-    pub fn get_vault_pda(authority: &Pubkey, index: u64, mint: &Pubkey, token_program: &Pubkey) -> (Pubkey, u8) {
+    pub fn find_vault_address(authority: &Address, index: u64, mint: &Address, token_program: &Address) -> (Address, u8) {
         let seeds: &[&[u8]] = &[
             VaultData::VAULT_SEED,
             &index.to_le_bytes(),
-            authority,
-            mint,
-            token_program,
+            authority.as_array(),
+            mint.as_array(),
+            token_program.as_array(),
         ];
-        find_program_address(seeds, &crate::ID)
+        Address::find_program_address(seeds, &crate::ID)
     }
-    pub fn get_vault_signer_seeds<'a>(authority: &'a Pubkey, vault_index: &'a [u8; size_of::<u64>()], mint: &'a Pubkey, token_program: &'a Pubkey, bump: &'a [u8]) -> [Seed<'a>; 6] {
+    pub fn vault_signer_seeds<'a>(authority: &'a Address, vault_index: &'a [u8; size_of::<u64>()], mint: &'a Address, token_program: &'a Address, bump: &'a [u8]) -> [Seed<'a>; 6] {
         seeds!(
             VaultData::VAULT_SEED,
             vault_index,
-            authority,
-            mint,
-            token_program,
+            authority.as_array(),
+            mint.as_array(),
+            token_program.as_array(),
             bump
         )
     }
@@ -198,7 +199,7 @@ impl VaultData {
             // If now is past the history time stamp and vault time frame.
             if history.timestamp() + timeframe < now {
                 if tot_amount.checked_add(amount).ok_or(ProgramError::ArithmeticOverflow)? > max_amount {
-                    msg!("Vault withdraw amount limit reached.");
+                    log!("Vault withdraw amount limit reached.");
                     return Err(PimeError::WithdrawLimitReachedAmount.into());
                 }
                 return Ok(VaultHistory::new(now, amount));
@@ -213,7 +214,7 @@ impl VaultData {
                 }
             }
         }
-        msg!("Vault withdraw transaction limit reached.");
+        log!("Vault withdraw transaction limit reached.");
         Err(PimeError::WithdrawLimitReachedTransactions.into())
     }
 }

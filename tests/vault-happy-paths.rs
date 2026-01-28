@@ -15,7 +15,6 @@ mod happy_paths_tests {
     use spl_associated_token_account_interface::address::{get_associated_token_address, get_associated_token_address_with_program_id};
     use spl_token_interface::state::Account as TokenAccount;
 
-    const PIME_ID: Pubkey = Pubkey::new_from_array(pime::ID);
     const TOKEN_PROGRAM: Pubkey = spl_token_interface::ID;
 
     #[test]
@@ -36,7 +35,7 @@ mod happy_paths_tests {
 
         // Create new mint
         let mint = Keypair::new();
-        initialize_mint(&mut svm, &alice.pubkey(), &alice, &mint, &TOKEN_PROGRAM);
+        initialize_mint(&mut svm, &alice.pubkey(), &alice, &mint, &TOKEN_PROGRAM).unwrap();
 
         // Create vault based on the new mint
         create_new_vault(&mut svm, &alice, &create_vault_instruction_data, &mint.pubkey());
@@ -61,7 +60,7 @@ mod happy_paths_tests {
 
         // Create new mint
         let mint = Keypair::new();
-        initialize_mint(&mut svm, &alice.pubkey(), &alice, &mint, &TOKEN_PROGRAM);
+        initialize_mint(&mut svm, &alice.pubkey(), &alice, &mint, &TOKEN_PROGRAM).unwrap();
 
         // Create vault based on the new mint
         create_new_vault(&mut svm, &alice, &create_vault_instruction_data, &mint.pubkey());
@@ -89,7 +88,7 @@ mod happy_paths_tests {
 
         // Create new mint
         let mint = Keypair::new();
-        initialize_mint(&mut svm, &alice.pubkey(), &alice, &mint, &TOKEN_PROGRAM);
+        initialize_mint(&mut svm, &alice.pubkey(), &alice, &mint, &TOKEN_PROGRAM).unwrap();
 
         // Create vault based on the new mint
         create_new_vault(
@@ -117,7 +116,7 @@ mod happy_paths_tests {
 
         let deposit_amount = 4_000;
         let deposit_inst = DepositToVaultInstructionData::new(
-            /* vault owner */ alice.pubkey().to_bytes(), 
+            /* vault owner */ alice.pubkey(), 
             /* vault index */ create_vault_instruction_data.vault_index(), 
             /* deposit amount */ deposit_amount);
 
@@ -147,7 +146,7 @@ mod happy_paths_tests {
 
         // Create new mint
         let mint = Keypair::new();
-        initialize_mint(&mut svm, &alice.pubkey(), &alice, &mint, &TOKEN_PROGRAM);
+        initialize_mint(&mut svm, &alice.pubkey(), &alice, &mint, &TOKEN_PROGRAM).unwrap();
 
         // Create vault based on the new mint
         create_new_vault(
@@ -175,7 +174,7 @@ mod happy_paths_tests {
 
         let deposit_amount = 4_000;
         let deposit_inst = DepositToVaultInstructionData::new(
-            /* vault owner */ alice.pubkey().to_bytes(), 
+            /* vault owner */ alice.pubkey(), 
             /* vault index */ create_vault_instruction_data.vault_index(), 
             /* deposit amount */ deposit_amount);
 
@@ -214,7 +213,7 @@ mod happy_paths_tests {
         let mint_amount = 1_000;
 
         // Mint tokens
-        initialize_mint(&mut svm, &alice.pubkey(), &alice, &mint, &TOKEN_PROGRAM);
+        initialize_mint(&mut svm, &alice.pubkey(), &alice, &mint, &TOKEN_PROGRAM).unwrap();
         mint_to(
             /* svm */ &mut svm, 
             /* amount */ mint_amount, 
@@ -244,7 +243,7 @@ mod happy_paths_tests {
         // Deposit to vault
         let deposit_amount = 500;
         let deposit_to_vault_inst_data = DepositToVaultInstructionData::new(
-            /* vault owner */ alice.pubkey().to_bytes(), 
+            /* vault owner */ alice.pubkey(), 
             /* vault_index */ create_vault_inst_data.vault_index(), 
             /* amount */ deposit_amount);
         deposit_to_vault(&mut svm, 
@@ -257,7 +256,7 @@ mod happy_paths_tests {
         let transfer_amount = 250;
         let book_transfer_inst_data = BookTransferInstructionData::new(
             /* amount */ transfer_amount, 
-            /* destination */ receiver_ata.to_bytes(),
+            /* destination */ receiver_ata,
             /* vault_index */ create_vault_inst_data.vault_index(), 
             /* transfer_index */ 1, 
             /* warmup */ 1, 
@@ -280,7 +279,7 @@ mod happy_paths_tests {
             book_transfer_inst_data.vault_index(), 
             book_transfer_inst_data.transfer_index(),
             alice.pubkey().as_array(),
-            &book_transfer_inst_data.destination,
+            book_transfer_inst_data.destination.as_array(),
             mint.pubkey().as_array(),
             TOKEN_PROGRAM.as_array()
         );
@@ -306,7 +305,7 @@ mod happy_paths_tests {
         let mint_amount = 1_000;
 
         // Mint tokens
-        initialize_mint(&mut svm, &alice.pubkey(), &alice, &mint, &TOKEN_PROGRAM);
+        initialize_mint(&mut svm, &alice.pubkey(), &alice, &mint, &TOKEN_PROGRAM).unwrap();
         mint_to(
             /* svm */ &mut svm, 
             /* amount */ mint_amount, 
@@ -336,7 +335,7 @@ mod happy_paths_tests {
         // Deposit to vault
         let deposit_amount = 500;
         let deposit_to_vault_inst_data = DepositToVaultInstructionData::new(
-            /* vault owner */ alice.pubkey().to_bytes(), 
+            /* vault owner */ alice.pubkey(), 
             /* vault index */ create_vault_inst_data.vault_index(), 
             /* amount */ deposit_amount);
         deposit_to_vault(&mut svm, 
@@ -349,7 +348,7 @@ mod happy_paths_tests {
         let transfer_amount = 250;
         let book_transfer_inst_data = BookTransferInstructionData::new(
             /* amount */ transfer_amount, 
-            /* destination */ destination_ata.to_bytes(),
+            /* destination */ destination_ata,
             /* vault_index */ create_vault_inst_data.vault_index(), 
             /* transfer_index */ 1, 
             /* warmup */ 0, 
@@ -388,7 +387,7 @@ mod happy_paths_tests {
         let mint_amount = 1_000;
 
         // Mint tokens
-        initialize_mint(&mut svm, &alice.pubkey(), &alice, &mint, &TOKEN_PROGRAM);
+        initialize_mint(&mut svm, &alice.pubkey(), &alice, &mint, &TOKEN_PROGRAM).unwrap();
         mint_to(
             /* svm */ &mut svm, 
             /* amount */ mint_amount, 
@@ -418,7 +417,7 @@ mod happy_paths_tests {
         // Deposit to vault
         let deposit_amount = 500;
         let deposit_to_vault_inst_data = DepositToVaultInstructionData::new(
-            /* vault owner */ alice.pubkey().to_bytes(), 
+            /* vault owner */ alice.pubkey(), 
             /* vault index */ create_vault_inst_data.vault_index(), 
             /* amount */ deposit_amount);
         deposit_to_vault(&mut svm, 
@@ -431,7 +430,7 @@ mod happy_paths_tests {
         let transfer_amount = 250;
         let book_transfer_inst_data = BookTransferInstructionData::new(
             /* amount */ transfer_amount, 
-            /* destination */ destination_ata.to_bytes(),
+            /* destination */ destination_ata,
             /* vault_index */ create_vault_inst_data.vault_index(), 
             /* transfer_index */ 1, 
             /* warmup */ 0, 
@@ -446,7 +445,7 @@ mod happy_paths_tests {
         let unbook_transfer_inst_data = UnbookTransferInstructionData::new(
             book_transfer_inst_data.vault_index(), 
             book_transfer_inst_data.transfer_index(),
-            destination_ata.to_bytes(),
+            destination_ata,
         );
         unbook_transfer(&mut svm, 
             /* inst data */ &unbook_transfer_inst_data, 

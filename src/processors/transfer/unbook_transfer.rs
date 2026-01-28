@@ -1,11 +1,12 @@
-use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, msg, program_error::ProgramError, pubkey::{Pubkey, pubkey_eq}};
+use pinocchio::{AccountView, Address, ProgramResult, address::address_eq, cpi::Signer, error::ProgramError};
+use solana_program_log::log;
 use pinocchio_token::state::TokenAccount;
 
 use crate::{errors::PimeError, interface::instructions::unbook_transfer_instruction::UnbookTransferInstructionData, states::{VaultData, transfer_data::TransferData}};
 
 /// Closes a booked transfer account.
 /// If the booking was never proceeded, the assets are transferred back to its owner.
-pub fn unbook_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) -> ProgramResult {
+pub fn unbook_transfer(accounts: &[AccountView], instruction_data: &[u8]) -> ProgramResult {
     
     // Deserialize instruction data
     let (vault_index, transfer_index, destination) = if instruction_data.len() < size_of::<UnbookTransferInstructionData>() - size_of::<u8>() {
@@ -15,7 +16,7 @@ pub fn unbook_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) -> Pro
         (
             u64::from_le_bytes( unsafe { *(instruction_data.as_ptr() as *const [u8; size_of::<u64>()]) }),
             u64::from_le_bytes( unsafe { *(instruction_data.as_ptr().add(size_of::<u64>()) as *const [u8; size_of::<u64>()]) }),
-            unsafe {&*(instruction_data.as_ptr().add(2 * size_of::<u64>()) as *const Pubkey)}
+            unsafe {&*(instruction_data.as_ptr().add(2 * size_of::<u64>()) as *const Address)}
         )
     };
 
@@ -25,93 +26,93 @@ pub fn unbook_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) -> Pro
     };
 
     if !authority.is_signer() {
-        msg!("Authority must be signer.");
+        log!("Authority must be signer.");
         return Err(ProgramError::MissingRequiredSignature);
     }
 
-    let vault_pda = VaultData::get_vault_pda(authority.key(), vault_index, mint.key(), token_program.key());
-    if !pubkey_eq(&vault_pda.0, vault.key()) {
-        msg!("Vault PDA incorrect.");
+    let vault_pda = VaultData::find_vault_address(authority.address(), vault_index, mint.address(), token_program.address());
+    if !address_eq(&vault_pda.0, vault.address()) {
+        log!("Vault PDA incorrect.");
         return Err(PimeError::IncorrectPDA.into());
     }
     if vault.lamports() == 0 {
-        msg!("Vault is not initialized.");
+        log!("Vault is not initialized.");
         return Err(ProgramError::UninitializedAccount);
     }
-    if !vault.is_owned_by(token_program.key()) {
-        msg!("Vault is not owned by the supplied token program.");
+    if !vault.owned_by(token_program.address()) {
+        log!("Vault is not owned by the supplied token program.");
         return Err(ProgramError::IllegalOwner);
     }
     if !vault.is_writable() {
-        msg!("Vault is not writeable.");
+        log!("Vault is not writeable.");
         return Err(ProgramError::Immutable);
     }
 
-    let vault_data_pda = VaultData::get_vault_data_pda(authority.key(), vault_index, mint.key(), token_program.key());
-    if !pubkey_eq(&vault_data_pda.0, vault_data.key()) {
-        msg!("Vault data PDA incorrect.");
+    let vault_data_pda = VaultData::find_vault_data_address(authority.address(), vault_index, mint.address(), token_program.address());
+    if !address_eq(&vault_data_pda.0, vault_data.address()) {
+        log!("Vault data PDA incorrect.");
         return Err(PimeError::IncorrectPDA.into());
     }
     if vault_data.lamports() == 0 {
-        msg!("Vault data is not initialized.");
+        log!("Vault data is not initialized.");
         return Err(ProgramError::UninitializedAccount);
     }
-    if !vault_data.is_owned_by(&crate::ID) {
-        msg!("Vault data is not owned by this program.");
+    if !vault_data.owned_by(&crate::ID) {
+        log!("Vault data is not owned by this program.");
         return Err(ProgramError::IllegalOwner);
     }
     if !vault_data.is_writable() {
-        msg!("Vault data is not writeable.");
+        log!("Vault data is not writeable.");
         return Err(ProgramError::Immutable);
     }
 
-    let transfer_pda = TransferData::get_transfer_pda(
-        authority.key(), 
+    let transfer_pda = TransferData::find_transfer_address(
+        authority.address(), 
         destination, 
         vault_index, 
         transfer_index, 
-        mint.key(), 
-        token_program.key()
+        mint.address(), 
+        token_program.address()
     );
-    if !pubkey_eq(&transfer_pda.0, transfer.key()) {
-        msg!("Transfer PDA incorrect.");
+    if !address_eq(&transfer_pda.0, transfer.address()) {
+        log!("Transfer PDA incorrect.");
         return Err(PimeError::IncorrectPDA.into());
     }
     if transfer.lamports() == 0 {
-        msg!("Transfer is not initilized.");
+        log!("Transfer is not initilized.");
         return Err(ProgramError::UninitializedAccount);
     }
-    if !transfer.is_owned_by(&crate::ID) {
-        msg!("Transfer is not owned by this program.");
+    if !transfer.owned_by(&crate::ID) {
+        log!("Transfer is not owned by this program.");
         return Err(ProgramError::IllegalOwner);
     }
 
-    let deposit_pda = TransferData::get_deposit_pda(authority.key(), destination, vault_index, transfer_index, mint.key(), token_program.key());
-    if !pubkey_eq(&deposit_pda.0, deposit.key()) {
-        msg!("Deposit PDA incorrect.");
+    let deposit_pda = TransferData::find_deposit_address(authority.address(), destination, vault_index, transfer_index, mint.address(), token_program.address());
+    if !address_eq(&deposit_pda.0, deposit.address()) {
+        log!("Deposit PDA incorrect.");
         return Err(PimeError::IncorrectPDA.into());
     }
     if deposit.lamports() == 0 {
-        msg!("Deposit is not initialized.");
+        log!("Deposit is not initialized.");
         return Err(ProgramError::UninitializedAccount);
     }
-    if !deposit.is_owned_by(token_program.key()){
-        msg!("The deposit is not owned by this program.");
+    if !deposit.owned_by(token_program.address()){
+        log!("The deposit is not owned by this program.");
         return Err(ProgramError::IllegalOwner);
     }
 
-    if !pubkey_eq(token_program.key(), &pinocchio_token::ID) {
-        msg!("Token program not supported.");
+    if !address_eq(token_program.address(), &pinocchio_token::ID) {
+        log!("Token program not supported.");
         return Err(PimeError::UnsupportedTokenProgram.into());
     }
 
-    if !mint.is_owned_by(token_program.key()) {
-        msg!("Mint is not owned by the provided token program.");
+    if !mint.owned_by(token_program.address()) {
+        log!("Mint is not owned by the provided token program.");
         return Err(ProgramError::InvalidAccountOwner);
     }
 
     if vault.data_len() != TokenAccount::LEN {
-        msg!("Vault does not contain enough data. Is it really a token account?");
+        log!("Vault does not contain enough data. Is it really a token account?");
         return Err(ProgramError::AccountDataTooSmall);
     }
     let vault_acc = unsafe {&*(vault.data_ptr() as *const TokenAccount)};
@@ -119,13 +120,13 @@ pub fn unbook_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) -> Pro
     let vault_index_bytes = vault_index.to_le_bytes();
     let transfer_index_bytes = transfer_index.to_le_bytes();
     let deposit_bump = &[deposit_pda.1];
-    let deposit_seeds = TransferData::get_deposit_signer_seeds(
-        authority.key(), 
+    let deposit_seeds = TransferData::deposit_signer_seeds(
+        authority.address(), 
         destination,
         &vault_index_bytes,
         & transfer_index_bytes, 
-        mint.key(), 
-        token_program.key(), 
+        mint.address(), 
+        token_program.address(), 
         deposit_bump
     );
 
@@ -150,7 +151,7 @@ pub fn unbook_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) -> Pro
     // Close the transfer account
     // SAFETY: Is not borrowed earlier. Transfer account is empty.
     unsafe {
-        *authority.borrow_mut_lamports_unchecked() += transfer.lamports();
+        authority.set_lamports(authority.lamports() + transfer.lamports());
         transfer.close_unchecked();
     }
 

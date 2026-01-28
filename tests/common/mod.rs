@@ -22,7 +22,7 @@
     use spl_token_interface::state::Mint;
     use spl_token_interface::state::Account as TokenAccount;
 
-    const PIME_ID: Pubkey = Pubkey::new_from_array(pime::ID);
+    const PIME_ID: Pubkey = Pubkey::new_from_array(*pime::ID.as_array());
     const TOKEN_PROGRAM: Pubkey = spl_token_interface::ID;
 
 pub fn create_svm() -> LiteSVM {
@@ -114,17 +114,16 @@ pub fn create_new_vault(
     inst_data: &CreateVaultInstructionData,
     mint: &Pubkey, 
 ) {
-    let vault_data = find_vault_data_pda(
+    let vault_data = VaultData::find_vault_data_address(
+        &authority.pubkey(), 
         inst_data.vault_index(), 
-        authority.pubkey().as_array(), 
-        mint.as_array(),
-        TOKEN_PROGRAM.as_array()
-    );
-    let vault = find_vault_pda(
+        mint, 
+        &TOKEN_PROGRAM);
+    let vault = VaultData::find_vault_address(
+        &authority.pubkey(),
         inst_data.vault_index(), 
-        authority.pubkey().as_array(), 
-        mint.as_array(),
-        TOKEN_PROGRAM.as_array()
+        mint,
+        &TOKEN_PROGRAM
     );
 
     let data = as_bytes(inst_data);
@@ -329,7 +328,7 @@ pub fn book_transfer(svm: &mut LiteSVM, inst_data: &BookTransferInstructionData,
         inst_data.vault_index(), 
         inst_data.transfer_index(),
         authority.pubkey().as_array(),
-        &inst_data.destination,
+        inst_data.destination.as_array(),
         mint.as_array(),
         TOKEN_PROGRAM.as_array()
     );
@@ -337,7 +336,7 @@ pub fn book_transfer(svm: &mut LiteSVM, inst_data: &BookTransferInstructionData,
         inst_data.vault_index(), 
         inst_data.transfer_index(),
         authority.pubkey().as_array(),
-        &inst_data.destination,
+        inst_data.destination.as_array(),
         mint.as_array(),
         TOKEN_PROGRAM.as_array()
     );
@@ -507,7 +506,7 @@ pub fn unbook_transfer(svm: &mut LiteSVM, inst_data: &UnbookTransferInstructionD
         inst_data.vault_index(), 
         inst_data.transfer_index(),
         authority.pubkey().as_array(),
-        &inst_data.destination,
+        inst_data.destination.as_array(),
         mint.as_array(),
         TOKEN_PROGRAM.as_array()
     );
@@ -515,7 +514,7 @@ pub fn unbook_transfer(svm: &mut LiteSVM, inst_data: &UnbookTransferInstructionD
         inst_data.vault_index(), 
         inst_data.transfer_index(),
         authority.pubkey().as_array(),
-        &inst_data.destination,
+        inst_data.destination.as_array(),
         mint.as_array(),
         TOKEN_PROGRAM.as_array()
     );
@@ -562,7 +561,7 @@ pub fn find_vault_data_pda(vault_index: u64, authority: &[u8; PUBKEY_BYTES], min
         mint,
         token_program,
     ], 
-        &Pubkey::new_from_array(pime::ID))
+        &Pubkey::new_from_array(*pime::ID.as_array()))
 }
 
 pub fn find_vault_pda(vault_index: u64, authority: &[u8; PUBKEY_BYTES], mint: &[u8; PUBKEY_BYTES], token_program: &[u8; PUBKEY_BYTES]) -> (Pubkey, u8) {
@@ -573,7 +572,7 @@ pub fn find_vault_pda(vault_index: u64, authority: &[u8; PUBKEY_BYTES], mint: &[
         mint,
         token_program,
     ],
-        &Pubkey::new_from_array(pime::ID))
+        &Pubkey::new_from_array(*pime::ID.as_array()))
 }
 
 pub fn find_transfer_pda(vault_index: u64, transfer_index: u64, authority: &[u8; PUBKEY_BYTES], destination: &[u8; PUBKEY_BYTES], mint: &[u8; PUBKEY_BYTES], token_program: &[u8; PUBKEY_BYTES] ) -> (Pubkey, u8) {
@@ -586,7 +585,7 @@ pub fn find_transfer_pda(vault_index: u64, transfer_index: u64, authority: &[u8;
         mint,
         token_program,
     ],
-        &Pubkey::new_from_array(pime::ID))
+        &Pubkey::new_from_array(*pime::ID.as_array()))
 }
 
 pub fn find_deposit_pda(vault_index: u64, transfer_index: u64, authority: &[u8; PUBKEY_BYTES], destination: &[u8; PUBKEY_BYTES], mint: &[u8; PUBKEY_BYTES], token_program: &[u8; PUBKEY_BYTES] ) -> (Pubkey, u8) {
@@ -599,5 +598,5 @@ pub fn find_deposit_pda(vault_index: u64, transfer_index: u64, authority: &[u8; 
         mint,
         token_program,
     ],
-        &Pubkey::new_from_array(pime::ID))
+        &Pubkey::new_from_array(*pime::ID.as_array()))
 }

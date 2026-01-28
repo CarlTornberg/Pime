@@ -1,11 +1,12 @@
-use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, msg, program_error::ProgramError, pubkey::{Pubkey, pubkey_eq}, sysvars::{Sysvar, rent::Rent}};
+use pinocchio::{AccountView, Address, ProgramResult, address::address_eq, cpi::Signer, error::ProgramError, sysvars::{Sysvar, rent::Rent}};
+use solana_program_log::log;
 use pinocchio_system::instructions::CreateAccount;
 use pinocchio_token::{instructions::Transfer, state::TokenAccount};
 
-use crate::{errors::PimeError, interface::instructions::book_transfer::BookTransferInstructionData, processors::shared::create_deposit_account::create_deposit_account, states::{Transmutable, VaultData, as_bytes, from_bytes, transfer_data::TransferData}};
+use crate::{errors::PimeError, interface::instructions::book_transfer::BookTransferInstructionData, processors::shared::create_deposit_account::create_deposit_account, states::{VaultData, as_bytes, from_bytes, transfer_data::TransferData}};
 
 /// Books a transfer and stores the assets in a temporary vault.
-pub fn process_book_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) -> ProgramResult {
+pub fn process_book_transfer(accounts: &[AccountView], instruction_data: &[u8]) -> ProgramResult {
 
     if instruction_data.len() < size_of::<BookTransferInstructionData>() - size_of::<u8>() {
         return Err(ProgramError::InvalidInstructionData);
@@ -14,20 +15,20 @@ pub fn process_book_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) 
     // SAFETY: instruction data is long enough
     let (amount, destination, vault_index, transfer_index, warmup, validity) = unsafe { (
         u64::from_le_bytes( *(instruction_data.as_ptr() as *const [u8; size_of::<u64>()])), 
-        &*(instruction_data.as_ptr().add(size_of::<u64>()) as *const Pubkey), 
-        u64::from_le_bytes( *(instruction_data.as_ptr().add(size_of::<Pubkey>() + size_of::<u64>()) as *const [u8; size_of::<u64>()])),
-        u64::from_le_bytes( *(instruction_data.as_ptr().add(size_of::<Pubkey>() + 2 * size_of::<u64>()) as *const [u8; size_of::<u64>()])),
-        i64::from_le_bytes( *(instruction_data.as_ptr().add(size_of::<Pubkey>() + 2 * size_of::<u64>() + size_of::<i64>()) as *const [u8; size_of::<u64>()])),
-        i64::from_le_bytes( *(instruction_data.as_ptr().add(size_of::<Pubkey>() + 2 * size_of::<u64>() + 2 * size_of::<i64>()) as *const [u8; size_of::<u64>()])),
+        &*(instruction_data.as_ptr().add(size_of::<u64>()) as *const Address), 
+        u64::from_le_bytes( *(instruction_data.as_ptr().add(size_of::<Address>() + size_of::<u64>()) as *const [u8; size_of::<u64>()])),
+        u64::from_le_bytes( *(instruction_data.as_ptr().add(size_of::<Address>() + 2 * size_of::<u64>()) as *const [u8; size_of::<u64>()])),
+        i64::from_le_bytes( *(instruction_data.as_ptr().add(size_of::<Address>() + 2 * size_of::<u64>() + size_of::<i64>()) as *const [u8; size_of::<u64>()])),
+        i64::from_le_bytes( *(instruction_data.as_ptr().add(size_of::<Address>() + 2 * size_of::<u64>() + 2 * size_of::<i64>()) as *const [u8; size_of::<u64>()])),
     ) 
     };
 
     if warmup < 0 {
-        msg!("Warm-up must be positive.");
+        log!("Warm-up must be positive.");
         return Err(ProgramError::InvalidInstructionData);
     }
     if validity < 0 {
-        msg!("Validity must be positive.");
+        log!("Validity must be positive.");
         return Err(ProgramError::InvalidInstructionData);
     }
 
@@ -39,89 +40,89 @@ pub fn process_book_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) 
         return Err(ProgramError::MissingRequiredSignature);
     }
 
-    if !mint.is_owned_by(token_program.key()) {
-        msg!("Mint not owned by supplied token program.");
+    if !mint.owned_by(token_program.address()) {
+        log!("Mint not owned by supplied token program.");
         return Err(ProgramError::IllegalOwner);
     }
 
-    let vault_data_pda = VaultData::get_vault_data_pda(authority.key(), vault_index, mint.key(), token_program.key());
-    if !pubkey_eq(vault_data.key(), &vault_data_pda.0) {
-        msg!("Incorrect vault data PDA");
+    let vault_data_pda = VaultData::find_vault_data_address(authority.address(), vault_index, mint.address(), token_program.address());
+    if !address_eq(vault_data.address(), &vault_data_pda.0) {
+        log!("Incorrect vault data PDA");
         return Err(PimeError::IncorrectPDA.into());
     }
     if vault_data.lamports() == 0 {
-        msg!("Vault data is not initialized.");
+        log!("Vault data is not initialized.");
         return Err(ProgramError::UninitializedAccount);
     }
-    if !vault_data.is_owned_by(&crate::ID) {
-        msg!("Vault data account is not owned by this program.");
+    if !vault_data.owned_by(&crate::ID) {
+        log!("Vault data account is not owned by this program.");
         return Err(ProgramError::IllegalOwner);
     }
     if !vault_data.is_writable() {
-        msg!("Vault data is not writable.");
+        log!("Vault data is not writable.");
         return Err(ProgramError::Immutable);
     }
     if vault_data.data_len() < size_of::<VaultData>() {
-        msg!("Vault data is of incorrect size.");
+        log!("Vault data is of incorrect size.");
         return Err(ProgramError::AccountDataTooSmall);
     }
     // SAFETY: Vault data is not borrowed before this. 
     let vault_data_account = 
-    unsafe { from_bytes::<VaultData>(&vault_data.borrow_data_unchecked()[..size_of::<VaultData>()]) }?;
+    unsafe { from_bytes::<VaultData>(&vault_data.borrow_unchecked()[..size_of::<VaultData>()]) }?;
     if vault_data_account.transfer_min_warmup() < warmup {
-        msg!("The instructed warm-up violates the vaults min warm-up.");
+        log!("The instructed warm-up violates the vaults min warm-up.");
         return Err(PimeError::VaultWarmupViolation.into());
     }
 
-    let vault_pda = VaultData::get_vault_pda(authority.key(), vault_index, mint.key(), token_program.key());
-    if !pubkey_eq(vault.key(), &vault_pda.0) {
-        msg!("Incorrect vault PDA");
+    let vault_pda = VaultData::find_vault_address(authority.address(), vault_index, mint.address(), token_program.address());
+    if !address_eq(vault.address(), &vault_pda.0) {
+        log!("Incorrect vault PDA");
         return Err(PimeError::IncorrectPDA.into());
     }
     if vault.lamports() == 0 {
-        msg!("Vault is not initialized.");
+        log!("Vault is not initialized.");
         return Err(ProgramError::UninitializedAccount);
     }
-    if !vault.is_owned_by(token_program.key()) {
-        msg!("Vault account is not owned by the supplied token program.");
+    if !vault.owned_by(token_program.address()) {
+        log!("Vault account is not owned by the supplied token program.");
         return Err(ProgramError::IllegalOwner);
     }
     if !vault.is_writable() {
-        msg!("Vault is not writeable.");
+        log!("Vault is not writeable.");
         return Err(ProgramError::Immutable);
     }
     if vault.data_len() < TokenAccount::LEN {
-        msg!("Vault is not of enough length. Is it really a token account?");
+        log!("Vault is not of enough length. Is it really a token account?");
         return Err(ProgramError::AccountDataTooSmall);
     }
     // SAFETY vault is read-only by this call, and not used after the Token Program CPI.
     // let vault_account = unsafe { TokenAccount::from_bytes_unchecked(vault.borrow_data_unchecked()) };
 
-    let transfer_pda = TransferData::get_transfer_pda(authority.key(), destination, vault_index, transfer_index, mint.key(), token_program.key());
-    if !pubkey_eq(transfer.key(), &transfer_pda.0) {
-        msg!("Incorrect transfer PDA");
+    let transfer_pda = TransferData::find_transfer_address(authority.address(), destination, vault_index, transfer_index, mint.address(), token_program.address());
+    if !address_eq(transfer.address(), &transfer_pda.0) {
+        log!("Incorrect transfer PDA");
         return Err(PimeError::IncorrectPDA.into());
     }
     if transfer.lamports() != 0 {
-        msg!("A transfer is already booked.");
+        log!("A transfer is already booked.");
         return Err(ProgramError::AccountAlreadyInitialized);
     }
     if !transfer.is_writable() {
-        msg!("Transfer is not writable.");
+        log!("Transfer is not writable.");
         return Err(ProgramError::Immutable);
     }
 
-    let deposit_pda = TransferData::get_deposit_pda(authority.key(), destination, vault_index, transfer_index, mint.key(), token_program.key());
-    if !pubkey_eq(deposit.key(), &deposit_pda.0) {
-        msg!("Incorrect deposit PDA");
+    let deposit_pda = TransferData::find_deposit_address(authority.address(), destination, vault_index, transfer_index, mint.address(), token_program.address());
+    if !address_eq(deposit.address(), &deposit_pda.0) {
+        log!("Incorrect deposit PDA");
         return Err(PimeError::IncorrectPDA.into());
     }
     if deposit.lamports() != 0 {
-        msg!("The deposit is already in use");
+        log!("The deposit is already in use");
         return Err(ProgramError::AccountAlreadyInitialized);
     }
     if !deposit.is_writable() {
-        msg!("Deposit is not writable.");
+        log!("Deposit is not writable.");
         return Err(ProgramError::Immutable);
     }
 
@@ -129,19 +130,19 @@ pub fn process_book_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) 
     let transfer_index_bytes = transfer_index.to_le_bytes();
     let vault_index_bytes = vault_index.to_le_bytes();
     let transfer_bump = &[transfer_pda.1];
-    let transfer_seed = TransferData::get_transfer_signer_seeds(
-        authority.key(), 
+    let transfer_seed = TransferData::transfer_signer_seeds(
+        authority.address(), 
         destination, 
         &vault_index_bytes, 
         &transfer_index_bytes, 
-        mint.key(), 
-        token_program.key(), 
+        mint.address(), 
+        token_program.address(), 
         transfer_bump
     );
     CreateAccount {
         from: authority,
         to: transfer,
-        lamports: Rent::get()?.minimum_balance(size_of::<TransferData>()),
+        lamports: Rent::get()?.try_minimum_balance(size_of::<TransferData>())?,
         space: size_of::<TransferData>() as u64,
         owner: &crate::ID,
     }.invoke_signed(&[Signer::from(&transfer_seed)])?;
@@ -152,39 +153,39 @@ pub fn process_book_transfer(accounts: &[AccountInfo], instruction_data: &[u8]) 
             size_of::<TransferData>()) }
         .copy_from_slice(as_bytes(
             &TransferData::new(
-                /* vault data */ *vault_data.key(), 
+                /* vault data */ vault_data.address().clone(), 
                 /* amount */ amount,
-                /* destination */ *destination,
+                /* destination */ destination.clone(),
                 /* warm-up */ warmup, 
                 /* validity */ validity)?
         ));
 
     //      Create deposit token account
     let deposit_bump = &[deposit_pda.1];
-    let deposit_signer_seeds = TransferData::get_deposit_signer_seeds(
-        authority.key(), 
+    let deposit_signer_seeds = TransferData::deposit_signer_seeds(
+        authority.address(), 
         destination, 
         &vault_index_bytes, 
         &transfer_index_bytes,
-        mint.key(), 
-        token_program.key(), 
+        mint.address(), 
+        token_program.address(), 
         deposit_bump
     );
     create_deposit_account(
         /* payer */ authority,
         /* deposit */ deposit,
         /* mint */ mint, 
-        /* token_program */ token_program.key(),
+        /* token_program */ token_program.address(),
         /* deposit signer */ &Signer::from(&deposit_signer_seeds)
     )?;
 
     //      Transfer from vault to deposit
     let vault_bump = &[vault_pda.1]; // Prevent dropping
-    let vault_signer_seed = VaultData::get_vault_signer_seeds(
-        authority.key(), 
+    let vault_signer_seed = VaultData::vault_signer_seeds(
+        authority.address(), 
         &vault_index_bytes, 
-        mint.key(), 
-        token_program.key(), 
+        mint.address(), 
+        token_program.address(), 
         vault_bump);
     Transfer {
         from: vault,

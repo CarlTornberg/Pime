@@ -1,14 +1,15 @@
-use pinocchio::{account_info::AccountInfo, instruction::Signer, msg, program_error::ProgramError, pubkey::pubkey_eq, sysvars::{Sysvar, clock::Clock}};
+use pinocchio::{AccountView, cpi::Signer, error::ProgramError, address::address_eq, sysvars::{Sysvar, clock::Clock}};
+use solana_program_log::log;
 
 use crate::{errors::PimeError, states::{VaultData, VaultHistory, from_bytes}};
 
 pub fn transfer(
-    authority: &AccountInfo, 
-    vault_data: &AccountInfo, 
-    vault: &AccountInfo, 
-    to: &AccountInfo, 
-    mint: &AccountInfo, 
-    token_program: &AccountInfo, 
+    authority: &AccountView, 
+    vault_data: &AccountView, 
+    vault: &AccountView, 
+    to: &AccountView, 
+    mint: &AccountView, 
+    token_program: &AccountView, 
     amount: u64, 
     vault_index: u64) -> Result<(), ProgramError> {
     // Perform safety check
@@ -26,32 +27,32 @@ pub fn transfer(
 
     //    Token Program
 
-    if !pubkey_eq(token_program.key(), &pinocchio_token::ID) {
+    if !address_eq(token_program.address(), &pinocchio_token::ID) {
         return Err(PimeError::UnsupportedTokenProgram.into());
     }
 
     //    Mint 
     
-    if !mint.is_owned_by(token_program.key()) {
-        msg!("Mint is not owned by supplied token program.");
+    if !mint.owned_by(token_program.address()) {
+        log!("Mint is not owned by supplied token program.");
         return Err(ProgramError::InvalidAccountOwner);
     }
 
     //      To 
 
     if to.lamports() == 0 {
-        msg!("Receiving account is not initialized.");
+        log!("Receiving account is not initialized.");
         return Err(ProgramError::UninitializedAccount);
     }
 
     //      Vault Data
     
     if vault_data.lamports() == 0 {
-        msg!("Vault data is not initialized.");
+        log!("Vault data is not initialized.");
         return Err(ProgramError::UninitializedAccount);
     }
 
-    if !vault_data.is_owned_by(&crate::ID) {
+    if !vault_data.owned_by(&crate::ID) {
         return Err(ProgramError::IllegalOwner);
     }
 
@@ -59,15 +60,15 @@ pub fn transfer(
         return Err(ProgramError::Immutable);
     }
 
-    let vault_data_pda = VaultData::get_vault_data_pda(authority.key(), vault_index, mint.key(), token_program.key());
-    if !pubkey_eq(vault_data.key(), &vault_data_pda.0) {
+    let vault_data_pda = VaultData::find_vault_data_address(authority.address(), vault_index, mint.address(), token_program.address());
+    if !address_eq(vault_data.address(), &vault_data_pda.0) {
         return Err(PimeError::IncorrectPDA.into());
     }
 
     //     Vault
 
-    let vault_pda = VaultData::get_vault_pda(authority.key(), vault_index, mint.key(), token_program.key());
-    if !pubkey_eq(vault.key(), &vault_pda.0) {
+    let vault_pda = VaultData::find_vault_address(authority.address(), vault_index, mint.address(), token_program.address());
+    if !address_eq(vault.address(), &vault_pda.0) {
         return Err(PimeError::IncorrectPDA.into());
     }
 
@@ -75,8 +76,8 @@ pub fn transfer(
         return Err(ProgramError::UninitializedAccount);
     }
 
-    if !vault.is_owned_by(token_program.key()) {
-        msg!("Vault is not owned by the supplied token program.");
+    if !vault.owned_by(token_program.address()) {
+        log!("Vault is not owned by the supplied token program.");
         return Err(ProgramError::InvalidAccountOwner);
     }
 
@@ -135,11 +136,11 @@ pub fn transfer(
 
             let vault_bump = &[vault_pda.1];
             let vault_index_bytes = vault_index.to_le_bytes();
-            let vault_signer_seeds = VaultData::get_vault_signer_seeds(
-                authority.key(), 
+            let vault_signer_seeds = VaultData::vault_signer_seeds(
+                authority.address(), 
                 &vault_index_bytes,
-                mint.key(), 
-                token_program.key(), 
+                mint.address(), 
+                token_program.address(), 
                 vault_bump
             );
             return pinocchio_token::instructions::Transfer {

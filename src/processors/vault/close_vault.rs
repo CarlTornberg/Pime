@@ -1,9 +1,10 @@
-use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, msg, program_error::ProgramError, pubkey::pubkey_eq};
+use pinocchio::{ProgramResult, AccountView, address::address_eq, cpi::Signer, error::ProgramError};
+use solana_program_log::log;
 use pinocchio_token::state::TokenAccount;
 
-use crate::{errors::PimeError, interface::instructions::close_vault_instruction::CloseVaultInstructionData, states::{Transmutable, VaultData, from_bytes}};
+use crate::{errors::PimeError, interface::instructions::close_vault_instruction::CloseVaultInstructionData, states::{Transmutable, VaultData}};
 
-pub fn process_close_vault(accounts: &[AccountInfo], inst_data: &[u8]) -> ProgramResult {
+pub fn process_close_vault(accounts: &[AccountView], inst_data: &[u8]) -> ProgramResult {
     
     //      INSTRUCTION DESERIALAZATION
 
@@ -24,44 +25,44 @@ pub fn process_close_vault(accounts: &[AccountInfo], inst_data: &[u8]) -> Progra
         return Err(ProgramError::MissingRequiredSignature);
     }
 
-    if !mint_info.is_owned_by(token_program_info.key()) {
-        msg!("Mint is not owned by the supplied token program.");
+    if !mint_info.owned_by(token_program_info.address()) {
+        log!("Mint is not owned by the supplied token program.");
         return Err(PimeError::UnsupportedTokenProgram.into());
     }
 
-    let vault_data_pda = VaultData::get_vault_data_pda(authority_info.key(), vault_index, mint_info.key(), token_program_info.key());
-    if !pubkey_eq(vault_data_info.key(), &vault_data_pda.0) {
-        msg!("Incorrect Vault data PDA");
+    let vault_data_pda = VaultData::find_vault_data_address(authority_info.address(), vault_index, mint_info.address(), token_program_info.address());
+    if !address_eq(vault_data_info.address(), &vault_data_pda.0) {
+        log!("Incorrect Vault data PDA");
         return Err(PimeError::IncorrectPDA.into());
     }
     if vault_data_info.lamports() == 0 {
-        msg!("Vault data is not initialized.");
+        log!("Vault data is not initialized.");
         return Err(ProgramError::UninitializedAccount);
     }
-    if !vault_data_info.is_owned_by(&crate::ID) {
-        msg!("Vault data is not owned by this program.");
+    if !vault_data_info.owned_by(&crate::ID) {
+        log!("Vault data is not owned by this program.");
         return Err(ProgramError::IllegalOwner);
     }
     if !vault_data_info.is_writable() {
-        msg!("Vault data is not writable.");
+        log!("Vault data is not writable.");
         return Err(ProgramError::Immutable);
     }
 
-    let vault_pda = VaultData::get_vault_pda(authority_info.key(), vault_index, mint_info.key(), token_program_info.key());
-    if !pubkey_eq(vault_info.key(), &vault_pda.0) {
-        msg!("Incorrect Vault PDA");
+    let vault_pda = VaultData::find_vault_address(authority_info.address(), vault_index, mint_info.address(), token_program_info.address());
+    if !address_eq(vault_info.address(), &vault_pda.0) {
+        log!("Incorrect Vault PDA");
         return Err(PimeError::IncorrectPDA.into());
     }
     if vault_info.lamports() == 0 {
-        msg!("Vault is not initialized.");
+        log!("Vault is not initialized.");
         return Err(ProgramError::UninitializedAccount);
     }
-    if !vault_info.is_owned_by(token_program_info.key()) {
-        msg!("Vault is not owned by the supplied token program.");
+    if !vault_info.owned_by(token_program_info.address()) {
+        log!("Vault is not owned by the supplied token program.");
         return Err(ProgramError::IllegalOwner);
     }
     if !vault_info.is_writable() {
-        msg!("Vault is not writable.");
+        log!("Vault is not writable.");
         return Err(ProgramError::Immutable);
     }
 
@@ -69,7 +70,7 @@ pub fn process_close_vault(accounts: &[AccountInfo], inst_data: &[u8]) -> Progra
 
     // Make sure vault has no open transfers
     let vault_data = if vault_data_info.data_len() < VaultData::LEN {
-        msg!("Vault data has insufficient data.");
+        log!("Vault data has insufficient data.");
         return Err(ProgramError::AccountDataTooSmall);
     }
     else {
@@ -77,25 +78,26 @@ pub fn process_close_vault(accounts: &[AccountInfo], inst_data: &[u8]) -> Progra
         unsafe { &*(vault_data_info.data_ptr() as *const VaultData) }
     };
     if vault_data.open_transfers() != 0 {
-        msg!("The vault has open transfers.");
+        log!("The vault has open transfers.");
         return Err(PimeError::VaultHasOpenTransfers.into());
     }
 
     // Check that vault is empty
-    let vault = unsafe { TokenAccount::from_account_info_unchecked(vault_info)? };
+    // SAFETY: Data is read only, therefore does not need borrow flag set.
+    let vault = unsafe { TokenAccount::from_account_view_unchecked(vault_info)? };
     if vault.amount() != 0 {
-        msg!("Vault is not empty.");
+        log!("Vault is not empty.");
         return Err(PimeError::VaultIsNotEmpty.into());
     }
 
     // close vault account
     let vault_index_bytes = vault_index.to_le_bytes();
     let vault_bump = &[vault_pda.1];
-    let vault_signer = VaultData::get_vault_signer_seeds(
-        authority_info.key(),
+    let vault_signer = VaultData::vault_signer_seeds(
+        authority_info.address(),
         &vault_index_bytes, 
-        mint_info.key(), 
-        token_program_info.key(), 
+        mint_info.address(), 
+        token_program_info.address(), 
         vault_bump);
     pinocchio_token::instructions::CloseAccount {
         account: vault_info,
@@ -106,7 +108,7 @@ pub fn process_close_vault(accounts: &[AccountInfo], inst_data: &[u8]) -> Progra
     // close vault data account
     // SAFETY: Is not borrowed earlier. Transfer account is empty.
     unsafe {
-        *authority_info.borrow_mut_lamports_unchecked() += vault_data_info.lamports();
+        authority_info.set_lamports(authority_info.lamports() + vault_data_info.lamports());
         vault_data_info.close_unchecked();
     }
 

@@ -1,8 +1,9 @@
-use pinocchio::{ProgramResult, account_info::AccountInfo, msg, program_error::ProgramError, pubkey::pubkey_eq, sysvars::{Sysvar, clock::Clock}};
+use pinocchio::{AccountView, ProgramResult, address::address_eq, error::ProgramError, sysvars::{Sysvar, clock::Clock}};
+use solana_program_log::log;
 
-use crate::{errors::PimeError, interface::instructions::withdraw_from_vault::WithdrawFromVaultInstructionData, processors::shared, states::{Transmutable, VaultData, VaultHistory, as_bytes, from_bytes}};
+use crate::{errors::PimeError, interface::instructions::withdraw_from_vault::WithdrawFromVaultInstructionData, processors::shared, states::{Transmutable, VaultData, VaultHistory, as_bytes}};
 
-pub fn process_withdraw_from_vault(accounts: &[AccountInfo], instrution_data: &[u8]) -> ProgramResult {
+pub fn process_withdraw_from_vault(accounts: &[AccountView], instrution_data: &[u8]) -> ProgramResult {
 
     // Extract instruction data
     let (vault_index, amount) = if instrution_data.len() >= size_of::<WithdrawFromVaultInstructionData>() - size_of::<u8>() {
@@ -24,48 +25,48 @@ pub fn process_withdraw_from_vault(accounts: &[AccountInfo], instrution_data: &[
         return Err(ProgramError::MissingRequiredSignature);
     }
 
-    if !mint_info.is_owned_by(token_program_info.key()) {
-        msg!("Mint is not owned by the supplied token program.");
+    if !mint_info.owned_by(token_program_info.address()) {
+        log!("Mint is not owned by the supplied token program.");
         return Err(ProgramError::InvalidAccountOwner);
     }
 
-    let vault_data_pda = VaultData::get_vault_data_pda(authority_info.key(), vault_index, mint_info.key(), token_program_info.key());
-    if !pubkey_eq(vault_data_info.key(), &vault_data_pda.0) {
-        msg!("Vault data PDA incorrect.");
+    let vault_data_pda = VaultData::find_vault_data_address(authority_info.address(), vault_index, mint_info.address(), token_program_info.address());
+    if !address_eq(vault_data_info.address(), &vault_data_pda.0) {
+        log!("Vault data PDA incorrect.");
         return Err(PimeError::IncorrectPDA.into());
     }
     if !vault_data_info.is_writable() {
-        msg!("Vault data is not writeable.");
+        log!("Vault data is not writeable.");
         return Err(ProgramError::Immutable);
     }
     if vault_data_info.lamports() == 0 {
-        msg!("Vault data is not initialized.");
+        log!("Vault data is not initialized.");
         return Err(ProgramError::UninitializedAccount);
     }
-    if !vault_data_info.is_owned_by(&crate::ID) {
-        msg!("Vault data is not owned by this program.");
+    if !vault_data_info.owned_by(&crate::ID) {
+        log!("Vault data is not owned by this program.");
          return Err(ProgramError::IllegalOwner);
     }
     if vault_data_info.data_len() < size_of::<VaultData>() {
-        msg!("Incorrect vault data len.");
+        log!("Incorrect vault data len.");
         return Err(ProgramError::InvalidAccountData);
     }
 
-    let vault_pda = VaultData::get_vault_pda(authority_info.key(), vault_index, mint_info.key(), token_program_info.key());
-    if !pubkey_eq(vault_info.key(), &vault_pda.0) {
-        msg!("Vault PDA incorrect.");
+    let vault_pda = VaultData::find_vault_address(authority_info.address(), vault_index, mint_info.address(), token_program_info.address());
+    if !address_eq(vault_info.address(), &vault_pda.0) {
+        log!("Vault PDA incorrect.");
         return Err(PimeError::IncorrectPDA.into());
     }
     if !vault_info.is_writable() {
-        msg!("Vault is not writeable.");
+        log!("Vault is not writeable.");
         return Err(ProgramError::Immutable);
     }
     if vault_info.lamports() == 0 {
-        msg!("Vault is not initialized.");
+        log!("Vault is not initialized.");
         return Err(ProgramError::UninitializedAccount);
     }
-    if !vault_info.is_owned_by(token_program_info.key()) {
-        msg!("Vault is not owned by the supplied token program.");
+    if !vault_info.owned_by(token_program_info.address()) {
+        log!("Vault is not owned by the supplied token program.");
          return Err(PimeError::UnsupportedTokenProgram.into());
     }
 

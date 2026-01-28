@@ -1,14 +1,14 @@
-use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, pubkey::Pubkey};
+use pinocchio::{ProgramResult, AccountView, cpi::Signer, Address};
 use pinocchio_token::state::TokenAccount;
 
 /// Create the Vault Token Account.
 ///
 /// Will fail if account exists (Does not check)
 pub fn create_vault_account (
-    payer: &AccountInfo, 
-    vault: &AccountInfo,
-    mint: &AccountInfo, 
-    token_program: &Pubkey, 
+    payer: &AccountView, 
+    vault: &AccountView,
+    mint: &AccountView, 
+    token_program: &Address, 
     vault_signer: &Signer,
 ) -> ProgramResult {
     let signer = core::slice::from_ref(vault_signer);
@@ -25,8 +25,8 @@ pub fn create_vault_account (
     pinocchio_token::instructions::InitializeAccount3 {
         account: vault,
         mint,
-        owner: vault.key(),
-    }.invoke_signed(signer)?;
+        owner: vault.address(),
+    }.invoke()?;
 
     Ok(())
 }

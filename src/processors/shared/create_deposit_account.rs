@@ -1,12 +1,12 @@
-use pinocchio::{ProgramResult, account_info::AccountInfo, instruction::Signer, pubkey::Pubkey};
+use pinocchio::{ProgramResult, AccountView, cpi::Signer, Address};
 use pinocchio_token::state::TokenAccount;
 
 
 pub fn create_deposit_account (
-    payer: &AccountInfo,
-    deposit: &AccountInfo, 
-    mint: &AccountInfo,
-    token_program: &Pubkey,
+    payer: &AccountView,
+    deposit: &AccountView, 
+    mint: &AccountView,
+    token_program: &Address,
     deposit_signer: &Signer,
 ) -> ProgramResult {
 
@@ -23,8 +23,8 @@ pub fn create_deposit_account (
     pinocchio_token::instructions::InitializeAccount3 {
         account: deposit,
         mint,
-        owner: deposit.key(),
-    }.invoke_signed(signer)?;
+        owner: deposit.address(),
+    }.invoke()?;
 
     Ok(())
 }
